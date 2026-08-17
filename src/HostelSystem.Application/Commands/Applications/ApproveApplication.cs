@@ -21,19 +21,22 @@ public class ApproveApplicationHandler : IRequestHandler<ApproveApplicationComma
     private readonly IStudentRepository _studentRepository;
     private readonly IAllocationRepository _allocationRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICacheService _cacheService;
 
     public ApproveApplicationHandler(
         IApplicationRepository applicationRepository,
         IRoomRepository roomRepository,
         IStudentRepository studentRepository,
         IAllocationRepository allocationRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ICacheService cacheService)
     {
         _applicationRepository = applicationRepository;
         _roomRepository = roomRepository;
         _studentRepository = studentRepository;
         _allocationRepository = allocationRepository;
         _unitOfWork = unitOfWork;
+        _cacheService = cacheService;
     }
 
     public async Task<Result<AllocationDto>> Handle(ApproveApplicationCommand cmd, CancellationToken ct)
@@ -62,11 +65,14 @@ public class ApproveApplicationHandler : IRequestHandler<ApproveApplicationComma
 
         await _allocationRepository.AddAsync(allocation, ct);
 
-        // SaveChanges — if RowVersion conflicts, DbUpdateConcurrencyException is thrown
+        // SaveChanges — if the concurrency token conflicts, DbUpdateConcurrencyException is thrown
         await _unitOfWork.SaveChangesAsync(ct);
 
         // Dispatch domain events AFTER successful save
         await _unitOfWork.DispatchDomainEventsAsync(ct);
+
+        // Room occupancy changed — invalidate cached availability
+        await _cacheService.RemoveAsync($"rooms:available:{room.HostelId}", ct);
 
         return Result<AllocationDto>.Ok(new AllocationDto(
             allocation.Id,

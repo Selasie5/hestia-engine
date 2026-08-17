@@ -4,6 +4,7 @@ using HostelSystem.Api.Middleware;
 using HostelSystem.Application;
 using HostelSystem.Identity;
 using HostelSystem.Infrastructure;
+using HostelSystem.Infrastructure.Persistence;
 using HostelSystem.Identity.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -109,5 +110,13 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHealthChecks("/health");
+
+// ─── Seed development data (idempotent — skips if data exists) ───
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
+    await seeder.SeedAsync();
+}
 
 app.Run();

@@ -25,7 +25,7 @@ public abstract class Entity
         _domainEvents.Clear();
     }
 
-    protected void SetUpdated()
+    protected virtual void SetUpdated()
     {
         UpdatedAt = DateTime.UtcNow;
     }
