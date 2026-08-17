@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HostelSystem.Api/HostelSystem.Api.csproj" />
+    <Project Path="src/HostelSystem.Application/HostelSystem.Application.csproj" />
+    <Project Path="src/HostelSystem.Domain/HostelSystem.Domain.csproj" />
+    <Project Path="src/HostelSystem.Identity/HostelSystem.Identity.csproj" />
+    <Project Path="src/HostelSystem.Infrastructure/HostelSystem.Infrastructure.csproj" />
+    <Project Path="src/HostelSystem.Web/HostelSystem.Web.csproj" />
+  </Folder>
+</Solution>

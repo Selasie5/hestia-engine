@@ -1,0 +1,74 @@
+# ===== Build outputs =====
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+[Rr]elease*/
+x64/
+x86/
+bld/
+out/
+publish/
+artifacts/
+
+# ===== .NET =====
+*.nupkg
+*.snupkg
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+project.lock.json
+project.fragment.lock.json
+_ReSharper*/
+*.DotSettings.user
+.DS_Store
+*.nuget.props
+*.nuget.targets
+[Dd]ebugPublic/
+
+# ===== Visual Studio / Rider / VS Code =====
+.vs/
+.idea/
+.vscode/
+*.swp
+*~
+.ntvs_analysis.dat
+
+# ===== Test results / coverage =====
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.coverage
+*.coveragexml
+*.pssym
+coverage-report/
+TestResults/
+*.trx
+
+# ===== Logs =====
+logs/
+*.log
+*.log.*
+Logs/
+
+# ===== Runtime data =====
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.mdf
+*.ldf
+
+# ===== Secrets / environment =====
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.*.Local.json
+*.secret
+*.key
+
+# ===== Docker =====
+*.local
