@@ -7,4 +7,8 @@
     <Project Path="src/HostelSystem.Infrastructure/HostelSystem.Infrastructure.csproj" />
     <Project Path="src/HostelSystem.Web/HostelSystem.Web.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HostelSystem.UnitTests/HostelSystem.UnitTests.csproj" />
+    <Project Path="tests/HostelSystem.IntegrationTests/HostelSystem.IntegrationTests.csproj" />
+  </Folder>
 </Solution>
