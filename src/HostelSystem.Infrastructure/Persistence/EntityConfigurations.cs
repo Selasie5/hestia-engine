@@ -42,12 +42,10 @@ public class RoomConfiguration : IEntityTypeConfiguration<Room>
             .IsRequired()
             .HasMaxLength(20);
 
-        builder.Property(r => r.PricePerSemester)
-            .HasColumnType("decimal(18,2)");
+        builder.Property(r => r.PricePerSemester);
 
-        // Optimistic concurrency
-        builder.Property(r => r.RowVersion)
-            .IsRowVersion()
+        // Optimistic concurrency (SQLite uses a GUID token; SQL Server would use rowversion)
+        builder.Property(r => r.Version)
             .IsConcurrencyToken();
 
         // CHECK constraint as defense-in-depth
@@ -145,7 +143,6 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.HasIndex(p => p.TransactionReference).IsUnique();
 
         builder.Property(p => p.Amount)
-            .HasColumnType("decimal(18,2)")
             .IsRequired();
 
         builder.Property(p => p.Status)

@@ -1,6 +1,7 @@
 using HostelSystem.Application.Interfaces;
 using HostelSystem.Infrastructure.Persistence;
 using HostelSystem.Infrastructure.Persistence.Repositories;
+using HostelSystem.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +17,7 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("DefaultConnection");
 
         services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(connectionString));
+            options.UseSqlite(connectionString));
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IHostelRepository, HostelRepository>();
@@ -25,6 +26,11 @@ public static class DependencyInjection
         services.AddScoped<IApplicationRepository, ApplicationRepository>();
         services.AddScoped<IAllocationRepository, AllocationRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
+
+        services.AddMemoryCache();
+        services.AddSingleton<ICacheService, MemoryCacheService>();
+
+        services.AddScoped<DataSeeder>();
 
         return services;
     }

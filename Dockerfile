@@ -2,7 +2,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Restore
-COPY HostelSystem.sln .
+COPY HostelSystem.slnx .
 COPY src/HostelSystem.Domain/*.csproj src/HostelSystem.Domain/
 COPY src/HostelSystem.Application/*.csproj src/HostelSystem.Application/
 COPY src/HostelSystem.Infrastructure/*.csproj src/HostelSystem.Infrastructure/

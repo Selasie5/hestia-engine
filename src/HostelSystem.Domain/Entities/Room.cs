@@ -13,8 +13,8 @@ public class Room : Entity
     public decimal PricePerSemester { get; private set; }
     public bool IsAvailable { get; private set; }
 
-    [Timestamp]
-    public byte[] RowVersion { get; set; } = default!;
+    [System.ComponentModel.DataAnnotations.ConcurrencyCheck]
+    public Guid Version { get; private set; } = Guid.NewGuid();
 
     private readonly List<RoomAllocation> _allocations = [];
     public IReadOnlyCollection<RoomAllocation> Allocations => _allocations.AsReadOnly();
@@ -74,6 +74,12 @@ public class Room : Entity
     }
 
     public int AvailableSpots => Capacity - CurrentOccupancy;
+
+    protected override void SetUpdated()
+    {
+        Version = Guid.NewGuid();
+        base.SetUpdated();
+    }
 
     public void UpdatePrice(decimal newPrice)
     {
