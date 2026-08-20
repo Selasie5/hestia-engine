@@ -117,6 +117,9 @@ if (app.Environment.IsDevelopment())
     using var scope = app.Services.CreateScope();
     var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
     await seeder.SeedAsync();
+
+     var identitySeeder = scope.ServiceProvider.GetRequiredService<IdentitySeeder>();
+    await identitySeeder.SeedAsync();
 }
 
 app.Run();

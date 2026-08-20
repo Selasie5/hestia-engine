@@ -39,6 +39,7 @@ public static class DependencyInjection
 
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<IdentitySeeder>();
 
         return services;
     }
