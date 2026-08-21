@@ -1,9 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>320eb9c0-72d2-48ff-b2cc-9f796bde8949</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +16,7 @@
     </PackageReference>
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+    <PackageReference Include="System.Threading.RateLimiting" Version="10.0.11" />
   </ItemGroup>
 
   <ItemGroup>
