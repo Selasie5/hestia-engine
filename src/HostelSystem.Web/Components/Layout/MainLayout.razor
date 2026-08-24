@@ -1,23 +1,64 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+<AuthorizeView>
+    <Authorized Context="authContext">
+        <div class="app-shell">
+            <aside class="sidebar">
+                <NavMenu />
+            </aside>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            <main class="app-main">
+                <header class="app-header">
+                    <div>
+                        <span class="header-eyebrow">Hestia portal</span>
+                        <strong>@(authContext.User.IsInRole("Admin") ? "Administration workspace" : "Student accommodation")</strong>
+                    </div>
+                    <div class="header-profile">
+                        <span class="profile-copy">
+                            <strong>@DisplayName(authContext.User)</strong>
+                            <small>@(authContext.User.IsInRole("Admin") ? "Administrator" : "Student")</small>
+                        </span>
+                        <span class="profile-avatar">@Initial(authContext.User)</span>
+                    </div>
+                </header>
+
+                <article class="content">
+                    @Body
+                </article>
+            </main>
         </div>
-
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="public-shell">
+            <header class="public-header">
+                <a class="public-brand" href="/">
+                    <span class="brand-mark">H</span>
+                    <span>Hestia</span>
+                </a>
+                <nav aria-label="Public navigation">
+                    <a href="/#how-it-works">How it works</a>
+                    <a href="/login">Sign in</a>
+                    <a class="btn btn-primary btn-sm" href="/register">Create account</a>
+                </nav>
+            </header>
+            <main class="public-content">@Body</main>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
+    An unexpected error occurred.
     <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+    <span class="dismiss">×</span>
 </div>
+
+@code {
+    private static string DisplayName(System.Security.Claims.ClaimsPrincipal user) =>
+        user.FindFirst("name")?.Value ?? user.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? user.FindFirst("email")?.Value ?? "Account";
+
+    private static string Initial(System.Security.Claims.ClaimsPrincipal user)
+    {
+        var value = DisplayName(user);
+        return string.IsNullOrWhiteSpace(value) ? "U" : value[..1].ToUpperInvariant();
+    }
+}

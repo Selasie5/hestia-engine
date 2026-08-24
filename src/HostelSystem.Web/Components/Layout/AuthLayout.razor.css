@@ -1,0 +1,88 @@
+.auth-layout {
+    min-height: 100vh;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #f5f7fb;
+}
+
+.auth-brand {
+    position: absolute;
+    top: 2rem;
+    left: 2.5rem;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: .7rem;
+    color: #17233c;
+    font-size: 1.2rem;
+    font-weight: 750;
+    text-decoration: none;
+    letter-spacing: -.02em;
+}
+
+.brand-mark {
+    display: grid;
+    width: 2.25rem;
+    height: 2.25rem;
+    place-items: center;
+    border-radius: .7rem;
+    color: white;
+    background: #3457d5;
+    box-shadow: 0 8px 20px rgba(52, 87, 213, .25);
+}
+
+.auth-main {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    flex: 1;
+    place-items: center;
+    width: 100%;
+    padding: 6.5rem 1.25rem 4rem;
+}
+
+.auth-footer {
+    position: relative;
+    z-index: 1;
+    padding: 0 1rem 1.5rem;
+    color: #8791a6;
+    font-size: .78rem;
+    text-align: center;
+}
+
+.auth-backdrop {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(2px);
+    pointer-events: none;
+}
+
+.auth-backdrop-one {
+    top: -12rem;
+    right: -10rem;
+    width: 34rem;
+    height: 34rem;
+    background: rgba(52, 87, 213, .09);
+}
+
+.auth-backdrop-two {
+    bottom: -17rem;
+    left: -12rem;
+    width: 36rem;
+    height: 36rem;
+    background: rgba(27, 178, 142, .08);
+}
+
+@media (max-width: 640px) {
+    .auth-brand {
+        top: 1.35rem;
+        left: 1.35rem;
+    }
+
+    .auth-main {
+        align-items: start;
+        padding-top: 5.75rem;
+    }
+}

@@ -3,49 +3,66 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
 
-<PageTitle>Admin Dashboard — HostelSystem</PageTitle>
+<PageTitle>Admin Dashboard — Hestia</PageTitle>
 
-<h3>Admin Dashboard</h3>
-<button class="btn btn-sm btn-outline-secondary mb-3" @onclick="Load">Refresh</button>
+<div class="page-heading">
+    <div><span class="eyebrow">Operations overview</span><h1>Admin dashboard</h1><p>Monitor accommodation activity and take action on priority items.</p></div>
+    <button class="btn btn-light" @onclick="Load" disabled="@isLoading">↻ Refresh data</button>
+</div>
 
 @if (isLoading)
 {
-    <p>Loading KPIs...</p>
+    <div class="loading-panel"><span class="spinner-border text-primary" aria-hidden="true"></span><p>Loading dashboard data…</p></div>
 }
 else if (!string.IsNullOrWhiteSpace(error))
 {
-    <div class="alert alert-danger">@error</div>
+    <div class="alert alert-danger"><strong>Dashboard unavailable.</strong> @error</div>
 }
 else
 {
-    <div class="row g-3 mb-4">
-        <div class="col-md-3"><div class="card text-center"><div class="card-body"><h5>@kpi.Hostels</h5><small>Hostels</small></div></div></div>
-        <div class="col-md-3"><div class="card text-center border-warning"><div class="card-body"><h5>@kpi.PendingApps</h5><small>Pending Apps</small></div></div></div>
-        <div class="col-md-3"><div class="card text-center border-success"><div class="card-body"><h5>@kpi.ActiveAllocations</h5><small>Active Allocations</small></div></div></div>
-        <div class="col-md-3"><div class="card text-center border-primary"><div class="card-body"><h5>GHS @kpi.Revenue</h5><small>Revenue (Completed)</small></div></div></div>
-    </div>
-    <div class="row g-3 mb-4">
-        <div class="col-md-3"><div class="card text-center"><div class="card-body"><h5>@kpi.TotalPayments</h5><small>Total Payments</small></div></div></div>
-        <div class="col-md-3"><div class="card text-center"><div class="card-body"><h5>@kpi.Overdue</h5><small>Overdue (Pending)</small></div></div></div>
+    <div class="metric-grid">
+        <article class="metric-card"><span class="metric-icon metric-indigo">▦</span><div><small>Hostels</small><strong>@kpi.Hostels</strong><span>Managed properties</span></div></article>
+        <article class="metric-card"><span class="metric-icon metric-amber">□</span><div><small>Pending applications</small><strong>@kpi.PendingApps</strong><a href="/admin/applications">Review queue →</a></div></article>
+        <article class="metric-card"><span class="metric-icon metric-teal">◇</span><div><small>Active allocations</small><strong>@kpi.ActiveAllocations</strong><a href="/admin/allocations">View allocations →</a></div></article>
+        <article class="metric-card"><span class="metric-icon metric-violet">₵</span><div><small>Completed revenue</small><strong>GHS @kpi.Revenue.ToString("N2")</strong><a href="/admin/payments">View payments →</a></div></article>
     </div>
 
-    <h5>Recent Pending Applications</h5>
-    @if (recent.Count == 0)
-    {
-        <div class="alert alert-info">No pending applications.</div>
-    }
-    else
-    {
-        <table class="table table-sm">
-            <thead><tr><th>#</th><th>Student</th><th>Room</th><th>Date</th><th>Action</th></tr></thead>
-            <tbody>
-                @foreach (var a in recent)
-                {
-                    <tr><td>@a.Id</td><td>@a.StudentName (@a.StudentNumber)</td><td>@a.RoomNumber (@a.HostelName)</td><td>@a.ApplicationDate.ToLocalTime().ToString("MM-dd")</td><td><a class="btn btn-sm btn-outline-primary" href="/admin/applications">Manage</a></td></tr>
-                }
-            </tbody>
-        </table>
-    }
+    <div class="dashboard-grid">
+        <section class="dashboard-panel">
+            <div class="panel-heading"><div><h2>Recent applications</h2><p>Latest students waiting for review</p></div><a href="/admin/applications">View all</a></div>
+            @if (recent.Count == 0)
+            {
+                <div class="empty-state"><span>✓</span><strong>All caught up</strong><p>There are no pending applications.</p></div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead><tr><th>Student</th><th>Room request</th><th>Submitted</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var a in recent)
+                            {
+                                <tr>
+                                    <td><div class="student-cell"><span>@Initial(a.StudentName)</span><div><strong>@a.StudentName</strong><small>@a.StudentNumber</small></div></div></td>
+                                    <td><strong>@a.RoomNumber</strong><small class="d-block text-muted">@a.HostelName</small></td>
+                                    <td>@a.ApplicationDate.ToLocalTime().ToString("dd MMM yyyy")</td>
+                                    <td><a class="btn btn-sm btn-outline-secondary" href="/admin/applications">Review</a></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <aside class="dashboard-panel quick-actions-panel">
+            <div class="panel-heading"><div><h2>Quick actions</h2><p>Common management tasks</p></div></div>
+            <a href="/admin/applications"><span class="metric-icon metric-amber">✓</span><div><strong>Process applications</strong><small>Approve or reject room requests</small></div><b>→</b></a>
+            <a href="/admin/hostels"><span class="metric-icon metric-indigo">＋</span><div><strong>Add a hostel</strong><small>Create and manage properties</small></div><b>→</b></a>
+            <a href="/admin/payments"><span class="metric-icon metric-teal">₵</span><div><strong>Verify payments</strong><small>Review pending transactions</small></div><b>→</b></a>
+            <div class="mini-summary"><span><small>Total payments</small><strong>@kpi.TotalPayments</strong></span><span><small>Overdue</small><strong>@kpi.Overdue</strong></span></div>
+        </aside>
+    </div>
 }
 
 @code {
@@ -58,11 +75,10 @@ else
     protected override async Task OnInitializedAsync() => await Load();
     private async Task Load()
     {
-        isLoading = true; error = null;
+        isLoading = true; error = null; recent = new();
         try
         {
             var client = HttpFactory.CreateClient("Api");
-            // parallel
             var hostelsTask = client.GetAsync($"{apiBase}/api/v1.0/Hostels?onlyActive=false&page=1&pageSize=1");
             var pendingTask = client.GetAsync($"{apiBase}/api/v1.0/Applications/pending?page=1&pageSize=5");
             var allocsTask = client.GetAsync($"{apiBase}/api/v1.0/Allocations?page=1&pageSize=1");
@@ -91,18 +107,14 @@ else
                 var b = await paysCompTask.Result.Content.ReadAsStringAsync();
                 var d = System.Text.Json.JsonDocument.Parse(b);
                 if (d.RootElement.TryGetProperty("items", out var its))
-                    foreach (var el in its.EnumerateArray())
-                        rev += el.GetProperty("amount").GetDecimal();
-                // also fetch overdue estimate via client? for now keep 0
+                    foreach (var el in its.EnumerateArray()) rev += el.GetProperty("amount").GetDecimal();
             }
             kpi = new Kpi(hostels, pending, allocs, rev, pays, over);
         }
         catch (Exception ex) { error = ex.Message; }
         finally { isLoading = false; }
     }
+    private static string Initial(string name) => string.IsNullOrWhiteSpace(name) ? "S" : name[..1].ToUpperInvariant();
     private record Kpi(int Hostels, int PendingApps, int ActiveAllocations, decimal Revenue, int TotalPayments, int Overdue);
     private record RecentApp(int Id, string StudentName, string StudentNumber, string RoomNumber, string HostelName, DateTime ApplicationDate);
 }
-
-
-

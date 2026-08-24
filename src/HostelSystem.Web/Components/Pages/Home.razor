@@ -1,7 +1,89 @@
 ﻿@page "/"
+@rendermode InteractiveServer
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Hestia — Hostel Accommodation</PageTitle>
 
-<h1>Hello, world!</h1>
+<AuthorizeView>
+    <Authorized Context="authContext">
+        <section class="portal-welcome">
+            <div>
+                <span class="eyebrow">@(authContext.User.IsInRole("Admin") ? "Admin overview" : "Student portal")</span>
+                <h1>Welcome back, @FirstName(authContext.User)</h1>
+                <p>@(authContext.User.IsInRole("Admin") ? "Manage applications, accommodation capacity and student payments from one workspace." : "Everything you need to find, apply for and manage your campus accommodation.")</p>
+            </div>
+            @if (authContext.User.IsInRole("Admin"))
+            {
+                <a class="btn btn-primary" href="/admin">Open admin dashboard</a>
+            }
+            else
+            {
+                <a class="btn btn-primary" href="/hostels">Browse available hostels</a>
+            }
+        </section>
 
-Welcome to your new app.
+        <div class="quick-grid">
+            @if (authContext.User.IsInRole("Admin"))
+            {
+                <a class="quick-card" href="/admin/applications"><span class="quick-icon indigo">✓</span><span><strong>Review applications</strong><small>Process the pending student queue</small></span><b>→</b></a>
+                <a class="quick-card" href="/admin/hostels"><span class="quick-icon teal">▦</span><span><strong>Manage hostels</strong><small>Update properties, rooms and capacity</small></span><b>→</b></a>
+                <a class="quick-card" href="/admin/payments"><span class="quick-icon amber">₵</span><span><strong>Track payments</strong><small>Verify transactions and issue refunds</small></span><b>→</b></a>
+            }
+            else
+            {
+                <a class="quick-card" href="/hostels"><span class="quick-icon indigo">▦</span><span><strong>Find accommodation</strong><small>Compare active hostels and available rooms</small></span><b>→</b></a>
+                <a class="quick-card" href="/applications"><span class="quick-icon teal">□</span><span><strong>Track applications</strong><small>Follow the status of your room requests</small></span><b>→</b></a>
+                <a class="quick-card" href="/payments"><span class="quick-icon amber">₵</span><span><strong>Manage payments</strong><small>Pay securely and view your history</small></span><b>→</b></a>
+            }
+        </div>
+
+        <section class="support-panel">
+            <div class="support-icon">?</div>
+            <div><strong>Need help with your accommodation?</strong><p>Contact the accommodation office for application, allocation or payment support.</p></div>
+        </section>
+    </Authorized>
+    <NotAuthorized>
+        <section class="hero">
+            <div class="hero-inner">
+                <div class="hero-copy">
+                    <span class="hero-badge"><i></i> Campus living, simplified</span>
+                    <h1>Find your place.<br /><span>Feel at home.</span></h1>
+                    <p>Discover available campus hostels, apply for the right room, and manage your accommodation from one secure portal.</p>
+                    <div class="hero-actions">
+                        <a class="btn btn-primary btn-lg" href="/register">Find accommodation <span>→</span></a>
+                        <a class="btn btn-light btn-lg" href="/login">Sign in to your account</a>
+                    </div>
+                    <div class="hero-trust"><span>✓</span> Secure applications <span>✓</span> Transparent allocations <span>✓</span> Easy payments</div>
+                </div>
+                <div class="hero-visual" aria-label="Accommodation portal preview">
+                    <div class="visual-orbit orbit-one"></div><div class="visual-orbit orbit-two"></div>
+                    <div class="preview-window">
+                        <div class="preview-top"><span class="preview-logo">H</span><i></i><i></i></div>
+                        <div class="preview-body">
+                            <div class="preview-sidebar"><b></b><span></span><span></span><span></span></div>
+                            <div class="preview-content"><small>Available accommodation</small><h3>Choose your new home</h3><div class="preview-cards"><div><i></i><b>Akuafo Hall</b><small>24 spaces available</small></div><div><i></i><b>Legon Hall</b><small>18 spaces available</small></div></div></div>
+                        </div>
+                    </div>
+                    <div class="floating-card"><span>✓</span><div><b>Application submitted</b><small>We'll keep you updated</small></div></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="steps" id="how-it-works">
+            <span class="eyebrow">A better accommodation experience</span>
+            <h2>From search to move-in, all in one place</h2>
+            <div class="steps-grid">
+                <article><span>01</span><div class="step-icon">⌕</div><h3>Explore hostels</h3><p>Compare hostel details, room capacity, and live availability.</p></article>
+                <article><span>02</span><div class="step-icon">□</div><h3>Apply online</h3><p>Choose a suitable room and submit your application in minutes.</p></article>
+                <article><span>03</span><div class="step-icon">✓</div><h3>Move in with confidence</h3><p>Track approval, complete payment, and view your allocation.</p></article>
+            </div>
+        </section>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private static string FirstName(System.Security.Claims.ClaimsPrincipal user)
+    {
+        var value = user.FindFirst("name")?.Value ?? user.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? "there";
+        return value.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "there";
+    }
+}
