@@ -2,6 +2,7 @@ using HostelSystem.Application.Interfaces;
 using HostelSystem.Infrastructure.Persistence;
 using HostelSystem.Infrastructure.Persistence.Repositories;
 using HostelSystem.Infrastructure.Services;
+using HostelSystem.Infrastructure.Services.Email;
 using HostelSystem.Infrastructure.Services.Payments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -64,6 +65,10 @@ public static class DependencyInjection
         });
 
         services.AddSingleton<IQrCodeService, QrCodeService>();
+
+        // ── Email (SMTP or console fallback) ──
+        services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
+        services.AddScoped<IEmailService, EmailService>();
 
         return services;
     }
