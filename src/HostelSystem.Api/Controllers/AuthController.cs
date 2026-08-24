@@ -2,11 +2,11 @@ using HostelSystem.Api.Controllers.Auth;
 using HostelSystem.Domain.Entities;
 using HostelSystem.Identity.Models;
 using HostelSystem.Identity.Services;
+using HostelSystem.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-// using HostelSystem.Application.Common.Interfaces; // <-- adjust: wherever IApplicationDbContext lives
 
 namespace HostelSystem.Api.Controllers;
 
@@ -18,21 +18,24 @@ public class AuthController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITokenService _tokenService;
     private readonly AppIdentityDbContext _identityContext;
-    // private readonly IApplicationDbContext _appContext; // <-- CHECK: swap for your actual Student persistence mechanism
+    private readonly AppDbContext _appContext;
     private readonly JwtSettings _jwtSettings;
+    private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         ITokenService tokenService,
         AppIdentityDbContext identityContext,
-        // IApplicationDbContext appContext,
-        Microsoft.Extensions.Options.IOptions<JwtSettings> jwtSettings)
+        AppDbContext appContext,
+        Microsoft.Extensions.Options.IOptions<JwtSettings> jwtSettings,
+        ILogger<AuthController> logger)
     {
         _userManager = userManager;
         _tokenService = tokenService;
         _identityContext = identityContext;
-        // _appContext = appContext;
+        _appContext = appContext;
         _jwtSettings = jwtSettings.Value;
+        _logger = logger;
     }
 
     [HttpPost("register")]
@@ -56,13 +59,29 @@ public class AuthController : ControllerBase
 
         await _userManager.AddToRoleAsync(user, "Student");
 
-        // CHECK: replace with your actual Gender enum parsing + Student persistence
-        var gender = Enum.Parse<HostelSystem.Domain.Enums.Gender>(request.Gender, ignoreCase: true);
+        // Persist Student domain entity (issue #11)
+        if (!Enum.TryParse<HostelSystem.Domain.Enums.Gender>(request.Gender, ignoreCase: true, out var gender))
+            gender = HostelSystem.Domain.Enums.Gender.Male;
+
         var student = new Student(user.Id, request.StudentNumber, request.FirstName, request.LastName, gender);
 
-        // TODO: persist Student via [whoever's] repository/DbContext — see issue for DB owner
-        // _appContext.Students.Add(student);
-        // await _appContext.SaveChangesAsync();
+        try
+        {
+            _appContext.Students.Add(student);
+            await _appContext.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE") == true || ex.InnerException?.Message.Contains("unique") == true)
+        {
+            _logger.LogWarning(ex, "Student persistence failed for {Email} — rolling back user", request.Email);
+            await _userManager.DeleteAsync(user);
+            return BadRequest(new { error = "Student number already exists." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to persist Student for {Email}", request.Email);
+            await _userManager.DeleteAsync(user);
+            return BadRequest(new { error = "Failed to create student profile: " + ex.Message });
+        }
 
         return await IssueTokensAsync(user);
     }

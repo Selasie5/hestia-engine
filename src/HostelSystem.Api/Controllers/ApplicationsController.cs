@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -46,5 +47,42 @@ public class ApplicationsController : ControllerBase
         return result.IsSuccess
             ? Ok(result.Value)
             : BadRequest(new { error = result.Error });
+    }
+
+    public record RejectRequest(string Reason);
+
+    /// <summary>
+    /// Reject a pending application (Admin only).
+    /// </summary>
+    [HttpPost("{id:int}/reject")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Reject(int id, [FromBody] RejectRequest body, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(body?.Reason))
+            return BadRequest(new { error = "Rejection reason is required." });
+
+        var reviewedBy = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email) ?? "admin";
+        var cmd = new RejectApplicationCommand(id, reviewedBy, body.Reason);
+        var result = await _mediator.Send(cmd, ct);
+        return result.IsSuccess ? Ok(new { success = true }) : BadRequest(new { error = result.Error });
+    }
+
+    public record CancelRequest(string? Reason);
+
+    /// <summary>
+    /// Cancel own application (Student owns) or Admin can cancel any. Triggers refund if payment completed.
+    /// </summary>
+    [HttpPost("{id:int}/cancel")]
+    [Authorize]
+    public async Task<IActionResult> Cancel(int id, [FromBody] CancelRequest? body, CancellationToken ct)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.Email);
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized(new { error = "Invalid token." });
+
+        var isAdmin = User.IsInRole("Admin");
+        var cmd = new CancelApplicationCommand(id, userId, isAdmin, body?.Reason);
+        var result = await _mediator.Send(cmd, ct);
+        return result.IsSuccess ? Ok(new { success = true }) : BadRequest(new { error = result.Error });
     }
 }
