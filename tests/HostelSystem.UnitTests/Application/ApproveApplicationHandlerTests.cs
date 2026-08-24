@@ -15,6 +15,7 @@ public class ApproveApplicationHandlerTests
     private readonly Mock<IRoomRepository> _rooms = new();
     private readonly Mock<IStudentRepository> _students = new();
     private readonly Mock<IAllocationRepository> _allocations = new();
+    private readonly Mock<IPaymentRepository> _payments = new();
     private readonly Mock<IUnitOfWork> _uow = new();
     private readonly Mock<ICacheService> _cache = new();
     private readonly ApproveApplicationHandler _sut;
@@ -26,6 +27,7 @@ public class ApproveApplicationHandlerTests
             _rooms.Object,
             _students.Object,
             _allocations.Object,
+            _payments.Object,
             _uow.Object,
             _cache.Object);
     }

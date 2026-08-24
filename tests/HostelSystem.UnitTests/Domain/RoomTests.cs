@@ -155,5 +155,5 @@ public class RoomTests
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static Student MakeStudent() =>
-        new("user-abc", "STU001", "John", "Doe", Domain.Enums.Gender.Male);
+        new("user-abc", "STU001", "John", "Doe", global::HostelSystem.Domain.Enums.Gender.Male);
 }
