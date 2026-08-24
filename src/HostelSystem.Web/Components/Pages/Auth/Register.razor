@@ -1,0 +1,86 @@
+@page "/register"
+@rendermode InteractiveServer
+@using HostelSystem.Web.Services.Auth
+@attribute [AllowAnonymous]
+
+<PageTitle>Register — HostelSystem</PageTitle>
+
+<h3>Create Student Account</h3>
+<p class="text-muted">Register to browse hostels and apply for a room. You will be auto-logged in.</p>
+
+<div class="card" style="max-width:560px">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">First Name</label>
+                <input class="form-control" @bind="firstName" />
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Last Name</label>
+                <input class="form-control" @bind="lastName" />
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input class="form-control" @bind="email" placeholder="student@example.com" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Student Number</label>
+            <input class="form-control" @bind="studentNumber" placeholder="UG20240099" />
+            <small class="text-muted">Unique — e.g. UG2024xxxx</small>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Gender</label>
+            <select class="form-select" @bind="gender">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control" @bind="password" />
+            <small class="text-muted">8+ chars, upper/lower/digit/symbol required.</small>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(error))
+        {
+            <div class="alert alert-danger">@error</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(info))
+        {
+            <div class="alert alert-success">@info</div>
+        }
+        <button class="btn btn-primary w-100" @onclick="DoRegister" disabled="@busy">
+            @(busy ? "Creating..." : "Create account")
+        </button>
+        <p class="mt-3 text-center"><a href="/login">Already have an account? Sign in</a></p>
+    </div>
+</div>
+
+@code {
+    [Inject] public AuthService Auth { get; set; } = default!;
+    [Inject] public NavigationManager Nav { get; set; } = default!;
+
+    private string email = "";
+    private string password = "";
+    private string firstName = "";
+    private string lastName = "";
+    private string studentNumber = "";
+    private string gender = "Male";
+    private string? error;
+    private string? info;
+    private bool busy;
+
+    private async Task DoRegister()
+    {
+        error = info = null;
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName) || string.IsNullOrWhiteSpace(studentNumber))
+        { error = "All fields are required."; return; }
+        busy = true;
+        var req = new RegisterRequestDto(email.Trim(), password, firstName.Trim(), lastName.Trim(), studentNumber.Trim(), gender);
+        var (ok, err) = await Auth.RegisterAsync(req);
+        busy = false;
+        if (!ok) { error = err; return; }
+        info = "Account created — redirecting...";
+        Nav.NavigateTo("/", forceLoad: false);
+    }
+}

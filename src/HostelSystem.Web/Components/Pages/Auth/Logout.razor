@@ -1,0 +1,22 @@
+@page "/logout"
+@rendermode InteractiveServer
+@using HostelSystem.Web.Services.Auth
+@attribute [AllowAnonymous]
+
+<PageTitle>Logout — HostelSystem</PageTitle>
+
+<h3>Signing out...</h3>
+
+@code {
+    [Inject] public AuthService Auth { get; set; } = default!;
+    [Inject] public NavigationManager Nav { get; set; } = default!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Auth.LogoutAsync();
+            Nav.NavigateTo("/login", forceLoad: false);
+        }
+    }
+}
