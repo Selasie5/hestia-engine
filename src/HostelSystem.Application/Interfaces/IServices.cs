@@ -22,7 +22,23 @@ public interface IPaymentGateway
     Task<PaymentGatewayResult> VerifyPaymentAsync(string reference, CancellationToken ct = default);
 }
 
-public record PaymentGatewayResult(bool IsSuccess, string? TransactionReference, string? ErrorMessage);
+/// <summary>
+/// Result from Paystack (or other) gateway. AuthorizationUrl is populated on Initialize only.
+/// </summary>
+public record PaymentGatewayResult(
+    bool IsSuccess,
+    string? TransactionReference,
+    string? AuthorizationUrl = null,
+    string? AccessCode = null,
+    string? ErrorMessage = null);
+
+public interface IQrCodeService
+{
+    /// <summary>Generates a PNG byte array for the given content.</summary>
+    byte[] GeneratePng(string content, int pixelsPerModule = 20);
+    /// <summary>Generates an SVG string for the given content.</summary>
+    string GenerateSvg(string content, int pixelsPerModule = 20);
+}
 
 public interface IEmailService
 {

@@ -2,6 +2,7 @@ using HostelSystem.Application.Interfaces;
 using HostelSystem.Infrastructure.Persistence;
 using HostelSystem.Infrastructure.Persistence.Repositories;
 using HostelSystem.Infrastructure.Services;
+using HostelSystem.Infrastructure.Services.Payments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,6 +53,17 @@ public static class DependencyInjection
         services.AddSingleton<ICacheService, MemoryCacheService>();
 
         services.AddScoped<DataSeeder>();
+
+        // ── Paystack + QR ──
+        services.Configure<PaystackSettings>(configuration.GetSection(PaystackSettings.SectionName));
+        services.AddHttpClient<IPaymentGateway, PaystackGateway>(client =>
+        {
+            var baseUrl = configuration["Paystack:BaseUrl"] ?? "https://api.paystack.co";
+            client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+
+        services.AddSingleton<IQrCodeService, QrCodeService>();
 
         return services;
     }

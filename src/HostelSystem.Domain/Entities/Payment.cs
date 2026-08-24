@@ -30,6 +30,24 @@ public class Payment : Entity
         Status = PaymentStatus.Pending;
     }
 
+    /// <summary>
+    /// Assigns a transaction reference for a pending payment before gateway init.
+    /// Keeps status Pending; reference is set so webhook/verify can locate the payment.
+    /// </summary>
+    public void AssignReference(string transactionReference, string? paymentMethod = null)
+    {
+        if (Status != PaymentStatus.Pending)
+            throw new BusinessRuleViolationException($"Cannot assign reference to payment with status {Status}.");
+
+        if (string.IsNullOrWhiteSpace(transactionReference))
+            throw new BusinessRuleViolationException("Transaction reference is required.");
+
+        TransactionReference = transactionReference;
+        if (!string.IsNullOrWhiteSpace(paymentMethod))
+            PaymentMethod = paymentMethod;
+        SetUpdated();
+    }
+
     public void MarkCompleted(string transactionReference, string paymentMethod)
     {
         if (Status == PaymentStatus.Completed)

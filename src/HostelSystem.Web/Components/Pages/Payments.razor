@@ -1,0 +1,99 @@
+@page "/payments"
+@rendermode InteractiveServer
+
+<PageTitle>Payments — HostelSystem</PageTitle>
+
+<h3>Payments</h3>
+<p class="text-muted">Initiate a payment with Paystack or view a QR code for your allocation.</p>
+
+<div class="card mb-4" style="max-width:560px">
+    <div class="card-body">
+        <h5 class="card-title">Initiate Payment</h5>
+        <div class="mb-3">
+            <label class="form-label">Payment ID</label>
+            <input class="form-control" @bind="paymentId" type="number" placeholder="e.g. 1" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Email (for Paystack receipt)</label>
+            <input class="form-control" @bind="email" placeholder="student@example.com" />
+        </div>
+        <button class="btn btn-primary" @onclick="Initiate" disabled="@isSubmitting">
+            @(isSubmitting ? "Initiating..." : "Initiate with Paystack")
+        </button>
+        @if (!string.IsNullOrWhiteSpace(message))
+        {
+            <div class="alert alert-@(isError ? "danger" : "success") mt-3">@message</div>
+        }
+        @if (lastResult is not null)
+        {
+            <div class="mt-3">
+                <p>Reference: <code>@lastResult.TransactionReference</code> • Amount: <strong>GHS @lastResult.Amount</strong></p>
+                @if (!string.IsNullOrWhiteSpace(lastResult.AuthorizationUrl))
+                {
+                    <a class="btn btn-success btn-sm" href="@lastResult.AuthorizationUrl" target="_blank">Open Paystack Checkout</a>
+                }
+                <div class="mt-3">
+                    <p class="mb-1"><small>QR (encodes reference + amount + currency):</small></p>
+                    <img src="@($"{apiBase}/api/v1.0/Payments/{lastResult.TransactionReference}/qr?format=png")"
+                         alt="QR @lastResult.TransactionReference" style="max-width:260px; border:1px solid #ddd; padding:6px; background:white;" />
+                    <div class="mt-2">
+                        <a href="@($"{apiBase}/api/v1.0/Payments/{lastResult.TransactionReference}/qr?format=png")" target="_blank" class="btn btn-outline-secondary btn-sm">PNG</a>
+                        <a href="@($"{apiBase}/api/v1.0/Payments/{lastResult.TransactionReference}/qr?format=svg")" target="_blank" class="btn btn-outline-secondary btn-sm ms-1">SVG</a>
+                        <a href="@($"/payments/{lastResult.TransactionReference}")" class="btn btn-outline-primary btn-sm ms-1">Details →</a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card" style="max-width:560px">
+    <div class="card-body">
+        <h5 class="card-title">View QR by Reference</h5>
+        <div class="input-group">
+            <input class="form-control" @bind="viewRef" placeholder="HS-1-20260825-AB12CD34" />
+            <a class="btn btn-outline-primary" href="@($"/payments/{viewRef}")">View</a>
+        </div>
+        <small class="text-muted">Enter a transaction reference (e.g. HS-...) to see its QR.</small>
+    </div>
+</div>
+
+@code {
+    [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
+    [Inject] public IConfiguration Config { get; set; } = default!;
+    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
+
+    private int paymentId;
+    private string email = "";
+    private string viewRef = "";
+    private string? message;
+    private bool isError;
+    private bool isSubmitting;
+    private InitiateResult? lastResult;
+
+    private async Task Initiate()
+    {
+        isError = false; message = null;
+        if (paymentId <= 0 || string.IsNullOrWhiteSpace(email))
+        {
+            isError = true; message = "Payment ID and email are required."; return;
+        }
+        isSubmitting = true;
+        try
+        {
+            var client = HttpFactory.CreateClient("Api");
+            var res = await client.PostAsJsonAsync($"{apiBase}/api/v1.0/Payments/initiate", new { paymentId, email });
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode)
+            {
+                isError = true; message = body; return;
+            }
+            lastResult = System.Text.Json.JsonSerializer.Deserialize<InitiateResult>(body, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            message = "Initialized — open Paystack checkout or scan QR.";
+        }
+        catch (Exception ex) { isError = true; message = ex.Message; }
+        finally { isSubmitting = false; }
+    }
+
+    private record InitiateResult(string TransactionReference, decimal Amount, string? AuthorizationUrl, string? AccessCode, string Status);
+}

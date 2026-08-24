@@ -44,6 +44,7 @@ public interface IAllocationRepository
 {
     Task<RoomAllocation?> GetByIdAsync(int id, CancellationToken ct = default);
     Task<RoomAllocation?> GetActiveByStudentIdAsync(int studentId, CancellationToken ct = default);
+    Task<RoomAllocation?> GetByApplicationIdAsync(int applicationId, CancellationToken ct = default);
     Task AddAsync(RoomAllocation allocation, CancellationToken ct = default);
     void Update(RoomAllocation allocation);
 }
@@ -52,6 +53,8 @@ public interface IPaymentRepository
 {
     Task<Payment?> GetByIdAsync(int id, CancellationToken ct = default);
     Task<Payment?> GetByTransactionReferenceAsync(string reference, CancellationToken ct = default);
+    Task<Payment?> GetByAllocationIdAsync(int allocationId, CancellationToken ct = default);
+    Task<List<Payment>> GetByStudentIdAsync(int studentId, CancellationToken ct = default);
     Task AddAsync(Payment payment, CancellationToken ct = default);
     void Update(Payment payment);
 }

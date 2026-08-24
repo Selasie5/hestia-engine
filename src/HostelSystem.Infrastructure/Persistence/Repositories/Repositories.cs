@@ -221,6 +221,12 @@ public class AllocationRepository : IAllocationRepository
             .FirstOrDefaultAsync(a => a.StudentId == studentId && a.IsActive, ct);
     }
 
+    public async Task<RoomAllocation?> GetByApplicationIdAsync(int applicationId, CancellationToken ct = default)
+    {
+        return await _context.RoomAllocations
+            .FirstOrDefaultAsync(a => a.ApplicationId == applicationId, ct);
+    }
+
     public async Task AddAsync(RoomAllocation allocation, CancellationToken ct = default)
     {
         await _context.RoomAllocations.AddAsync(allocation, ct);
@@ -250,6 +256,21 @@ public class PaymentRepository : IPaymentRepository
     {
         return await _context.Payments
             .FirstOrDefaultAsync(p => p.TransactionReference == reference, ct);
+    }
+
+    public async Task<Payment?> GetByAllocationIdAsync(int allocationId, CancellationToken ct = default)
+    {
+        return await _context.Payments
+            .FirstOrDefaultAsync(p => p.AllocationId == allocationId, ct);
+    }
+
+    public async Task<List<Payment>> GetByStudentIdAsync(int studentId, CancellationToken ct = default)
+    {
+        return await _context.Payments
+            .AsNoTracking()
+            .Where(p => p.StudentId == studentId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync(ct);
     }
 
     public async Task AddAsync(Payment payment, CancellationToken ct = default)
