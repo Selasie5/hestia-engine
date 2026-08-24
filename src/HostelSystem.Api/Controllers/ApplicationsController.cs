@@ -1,8 +1,9 @@
 using System.Security.Claims;
+using HostelSystem.Application.Interfaces;
+using HostelSystem.Application.Commands.Applications;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using HostelSystem.Application.Commands.Applications;
 
 namespace HostelSystem.Api.Controllers;
 
@@ -13,10 +14,31 @@ namespace HostelSystem.Api.Controllers;
 public class ApplicationsController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IStudentRepository _studentRepository;
+    private readonly IApplicationRepository _applicationRepository;
 
-    public ApplicationsController(IMediator mediator)
+    public ApplicationsController(IMediator mediator, IStudentRepository studentRepository, IApplicationRepository applicationRepository)
     {
         _mediator = mediator;
+        _studentRepository = studentRepository;
+        _applicationRepository = applicationRepository;
+    }
+
+    /// <summary>GET my applications (Student). Admin can still call but gets own.</summary>
+    [HttpGet("me")]
+    public async Task<IActionResult> GetMy(CancellationToken ct)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (string.IsNullOrWhiteSpace(userId)) return Unauthorized(new { error = "Invalid token." });
+        var student = await _studentRepository.GetByUserIdAsync(userId, ct);
+        if (student is null) return NotFound(new { error = "Student profile not found." });
+        var apps = await _applicationRepository.GetByStudentIdAsync(student.Id, ct);
+        var dtos = apps.Select(a => new
+        {
+            a.Id, a.StudentId, a.RoomId, Status = a.Status.ToString(), a.ApplicationDate, a.ReviewedOn, a.ReviewedBy, a.RejectionReason, a.AdditionalNotes,
+            roomNumber = a.Room?.RoomNumber, hostelName = a.Room?.Hostel?.Name
+        });
+        return Ok(dtos);
     }
 
     /// <summary>

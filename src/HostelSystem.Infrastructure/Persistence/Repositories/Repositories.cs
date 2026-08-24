@@ -206,6 +206,8 @@ public class ApplicationRepository : IApplicationRepository
         return await _context.RoomApplications
             .AsNoTracking()
             .Where(a => a.StudentId == studentId)
+            .Include(a => a.Room).ThenInclude(r => r.Hostel)
+            .Include(a => a.Student)
             .OrderByDescending(a => a.ApplicationDate)
             .ToListAsync(ct);
     }
