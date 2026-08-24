@@ -53,6 +53,11 @@ public class RoomConfiguration : IEntityTypeConfiguration<Room>
             "CK_Room_Occupancy",
             "[CurrentOccupancy] >= 0 AND [CurrentOccupancy] <= [Capacity]"));
 
+        // Performance: composite index for availability query
+        // WHERE HostelId = ? AND IsAvailable = 1 AND CurrentOccupancy < Capacity
+        builder.HasIndex(r => new { r.HostelId, r.IsAvailable, r.CurrentOccupancy })
+            .HasDatabaseName("IX_Rooms_HostelId_IsAvailable_CurrentOccupancy");
+
         builder.HasMany(r => r.Allocations)
             .WithOne(a => a.Room)
             .HasForeignKey(a => a.RoomId)
@@ -100,6 +105,17 @@ public class RoomApplicationConfiguration : IEntityTypeConfiguration<RoomApplica
         builder.Property(a => a.RejectionReason).HasMaxLength(500);
         builder.Property(a => a.AdditionalNotes).HasMaxLength(1000);
 
+        // Performance indexes
+        builder.HasIndex(a => a.Status)
+            .HasDatabaseName("IX_RoomApplications_Status");
+
+        builder.HasIndex(a => new { a.StudentId, a.Status })
+            .HasDatabaseName("IX_RoomApplications_StudentId_Status");
+
+        // RoomId already has FK index (IX_RoomApplications_RoomId) but declare explicitly
+        builder.HasIndex(a => a.RoomId)
+            .HasDatabaseName("IX_RoomApplications_RoomId");
+
         builder.HasOne(a => a.Student)
             .WithMany(s => s.Applications)
             .HasForeignKey(a => a.StudentId)
@@ -119,6 +135,10 @@ public class RoomAllocationConfiguration : IEntityTypeConfiguration<RoomAllocati
         builder.ToTable("RoomAllocations");
 
         builder.HasKey(a => a.Id);
+
+        // Performance: active allocation lookup per student
+        builder.HasIndex(a => new { a.StudentId, a.IsActive })
+            .HasDatabaseName("IX_RoomAllocations_StudentId_IsActive");
 
         builder.HasOne(a => a.Student)
             .WithMany()
@@ -141,6 +161,13 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.HasKey(p => p.Id);
 
         builder.HasIndex(p => p.TransactionReference).IsUnique();
+
+        // Performance indexes
+        builder.HasIndex(p => p.StudentId)
+            .HasDatabaseName("IX_Payments_StudentId");
+
+        builder.HasIndex(p => p.Status)
+            .HasDatabaseName("IX_Payments_Status");
 
         builder.Property(p => p.Amount)
             .IsRequired();
