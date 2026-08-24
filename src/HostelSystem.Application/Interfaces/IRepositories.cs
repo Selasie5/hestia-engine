@@ -39,6 +39,8 @@ public interface IApplicationRepository
     Task<RoomApplication?> GetByIdAsync(int id, CancellationToken ct = default);
     Task<List<RoomApplication>> GetByStudentIdAsync(int studentId, CancellationToken ct = default);
     Task<List<RoomApplication>> GetPendingAsync(CancellationToken ct = default);
+    Task<(List<RoomApplication> Items, int TotalCount)> GetPendingPagedAsync(int page, int pageSize, CancellationToken ct = default);
+    Task<(List<RoomApplication> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? search = null, string? status = null, CancellationToken ct = default);
     Task AddAsync(RoomApplication application, CancellationToken ct = default);
     void Update(RoomApplication application);
 }
@@ -48,6 +50,7 @@ public interface IAllocationRepository
     Task<RoomAllocation?> GetByIdAsync(int id, CancellationToken ct = default);
     Task<RoomAllocation?> GetActiveByStudentIdAsync(int studentId, CancellationToken ct = default);
     Task<RoomAllocation?> GetByApplicationIdAsync(int applicationId, CancellationToken ct = default);
+    Task<(List<RoomAllocation> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, bool? isActive = null, CancellationToken ct = default);
     Task AddAsync(RoomAllocation allocation, CancellationToken ct = default);
     void Update(RoomAllocation allocation);
 }
@@ -58,6 +61,7 @@ public interface IPaymentRepository
     Task<Payment?> GetByTransactionReferenceAsync(string reference, CancellationToken ct = default);
     Task<Payment?> GetByAllocationIdAsync(int allocationId, CancellationToken ct = default);
     Task<List<Payment>> GetByStudentIdAsync(int studentId, CancellationToken ct = default);
+    Task<(List<Payment> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? status = null, string? search = null, CancellationToken ct = default);
     Task AddAsync(Payment payment, CancellationToken ct = default);
     void Update(Payment payment);
 }

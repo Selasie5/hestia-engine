@@ -1,0 +1,113 @@
+@page "/admin/payments"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Payments — Admin</PageTitle>
+
+<h3>Payments</h3>
+<div class="d-flex gap-2 mb-3">
+    <select class="form-select form-select-sm" style="width:auto" @onchange="OnFilterChanged">
+        <option value="">All statuses</option>
+        <option>Pending</option><option>Completed</option><option>Failed</option><option>Refunded</option>
+    </select>
+    <button class="btn btn-sm btn-outline-secondary" @onclick="Load">Refresh</button>
+    <span class="align-self-center text-muted">Page @currentPage / @totalPages (total @total)</span>
+</div>
+
+@if (isLoading)
+{
+    <p>Loading...</p>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (items.Count==0)
+{
+    <div class="alert alert-info">No payments.</div>
+}
+else
+{
+    <table class="table table-sm">
+        <thead><tr><th>#</th><th>Student</th><th>Amount</th><th>Status</th><th>Ref</th><th>Due</th><th>Action</th></tr></thead>
+        <tbody>
+            @foreach (var p in items)
+            {
+                <tr>
+                    <td>@p.Id</td>
+                    <td>@p.StudentId</td>
+                    <td>GHS @p.Amount</td>
+                    <td><span class="badge bg-@(p.Status=="Completed"?"success":p.Status=="Pending"?"warning text-dark":"secondary")">@p.Status</span></td>
+                    <td><code>@(p.TransactionReference ?? "-")</code></td>
+                    <td>@p.DueDate.ToLocalTime().ToString("yyyy-MM-dd") @(p.IsOverdue?" (overdue)":"")</td>
+                    <td>
+                        @if (p.Status=="Pending" && !string.IsNullOrWhiteSpace(p.TransactionReference))
+                        {
+                            <button class="btn btn-sm btn-outline-success" @onclick="() => Verify(p.TransactionReference!)">Verify</button>
+                        }
+                        @if (p.Status=="Completed")
+                        {
+                            <button class="btn btn-sm btn-outline-danger ms-1" @onclick="() => Refund(p.Id)">Refund</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Prev" disabled="@(currentPage<=1)">Prev</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Next" disabled="@(currentPage>=totalPages)">Next</button>
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(msg))
+{
+    <div class="alert @(msgError?"alert-danger":"alert-success") mt-3">@msg</div>
+}
+
+@code {
+    [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
+    [Inject] public IConfiguration Config { get; set; } = default!;
+    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
+    private List<Row> items = new(); private bool isLoading = true; private string? error; private string? msg; private bool msgError;
+    private int currentPage=1; private int pageSize=10; private int total; private int totalPages; private string? filterStatus;
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load()
+    {
+        isLoading = true; error=null;
+        try{
+            var client=HttpFactory.CreateClient("Api");
+            var url = $"{apiBase}/api/v1.0/Payments?page={currentPage}&pageSize={pageSize}";
+            if(!string.IsNullOrWhiteSpace(filterStatus)) url += $"&status={filterStatus}";
+            var res=await client.GetAsync(url);
+            var body=await res.Content.ReadAsStringAsync();
+            if(!res.IsSuccessStatusCode){ error=body; return; }
+            var doc=System.Text.Json.JsonDocument.Parse(body);
+            total=doc.RootElement.GetProperty("total").GetInt32(); totalPages=(int)Math.Ceiling(total/(double)pageSize);
+            items=new();
+            foreach(var el in doc.RootElement.GetProperty("items").EnumerateArray())
+                items.Add(new Row(el.GetProperty("id").GetInt32(), el.GetProperty("studentId").GetInt32(), el.GetProperty("amount").GetDecimal(), el.GetProperty("status").GetString()??"", el.TryGetProperty("transactionReference", out var tr) && tr.ValueKind!= System.Text.Json.JsonValueKind.Null ? tr.GetString() : null, el.GetProperty("dueDate").GetDateTime(), el.GetProperty("isOverdue").GetBoolean()));
+        } catch(Exception ex){ error=ex.Message; } finally{ isLoading=false; }
+    }
+    private async Task OnFilterChanged(ChangeEventArgs e)
+    {
+        filterStatus = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value?.ToString();
+        currentPage = 1;
+        await Load();
+    }
+    private async Task Verify(string reference)
+    {
+        try{ var client=HttpFactory.CreateClient("Api"); var res=await client.GetAsync($"{apiBase}/api/v1.0/Payments/{reference}/verify"); var b=await res.Content.ReadAsStringAsync(); msg=b; msgError=!res.IsSuccessStatusCode; if(res.IsSuccessStatusCode) await Load(); } catch(Exception ex){ msg=ex.Message; msgError=true; }
+    }
+    private async Task Refund(int id)
+    {
+        try{ var client=HttpFactory.CreateClient("Api"); var res=await client.PostAsJsonAsync($"{apiBase}/api/v1.0/Payments/refund", new { paymentId = id }); var b=await res.Content.ReadAsStringAsync(); msg=b; msgError=!res.IsSuccessStatusCode; if(res.IsSuccessStatusCode) await Load(); } catch(Exception ex){ msg=ex.Message; msgError=true; }
+    }
+    private async Task Prev(){ if(currentPage>1){currentPage--; await Load();} }
+    private async Task Next(){ if(currentPage<totalPages){currentPage++; await Load();} }
+    private record Row(int Id, int StudentId, decimal Amount, string Status, string? TransactionReference, DateTime DueDate, bool IsOverdue);
+}
+
+
+
+

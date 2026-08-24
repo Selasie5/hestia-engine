@@ -75,6 +75,18 @@ public class AllocationsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
+    /// <summary>Admin: list allocations paged.</summary>
+    [HttpGet]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] bool? isActive = null, CancellationToken ct = default)
+    {
+        page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
+        var (items, total) = await _allocationRepository.GetPagedAsync(page, pageSize, isActive, ct);
+        Response.Headers["X-Total-Count"] = total.ToString();
+        var dtos = items.Select(a => new AllocationDto(a.Id, a.StudentId, a.Student?.FullName ?? a.StudentId.ToString(), a.RoomId, a.Room?.RoomNumber ?? a.RoomId.ToString(), a.Room?.Hostel?.Name ?? "N/A", a.AllocationDate, a.IsActive));
+        return Ok(new { items = dtos, total, page, pageSize });
+    }
+
     /// <summary>
     /// Get allocation by id (Admin or owner).
     /// </summary>

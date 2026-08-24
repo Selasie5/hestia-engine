@@ -1,0 +1,112 @@
+@page "/admin/allocations"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Allocations — Admin</PageTitle>
+
+<h3>Allocations</h3>
+<div class="d-flex gap-2 mb-3">
+    <button class="btn btn-sm btn-outline-secondary" @onclick="Load">Refresh</button>
+    <select class="form-select form-select-sm" style="width:auto" @onchange="OnFilterChanged">
+        <option value="">All</option>
+        <option value="active">Active</option>
+        <option value="inactive">Checked out</option>
+    </select>
+    <span class="align-self-center text-muted">Page @currentPage / @totalPages (total @total)</span>
+</div>
+
+@if (isLoading)
+{
+    <p>Loading...</p>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (items.Count==0)
+{
+    <div class="alert alert-info">No allocations.</div>
+}
+else
+{
+    <table class="table table-sm">
+        <thead><tr><th>#</th><th>Student</th><th>Room</th><th>Allocation</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+            @foreach (var a in items)
+            {
+                <tr>
+                    <td>@a.Id</td>
+                    <td>@a.StudentName</td>
+                    <td>@a.RoomNumber (@a.HostelName)</td>
+                    <td>@a.AllocationDate.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                    <td><span class="badge @(a.IsActive?"bg-success":"bg-secondary")">@(a.IsActive?"Active":"Checked out")</span></td>
+                    <td>@if (a.IsActive){<button class="btn btn-sm btn-outline-danger" @onclick="() => Checkout(a.Id)" disabled="@(busy==a.Id)">Checkout</button>}</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Prev" disabled="@(currentPage<=1)">Prev</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Next" disabled="@(currentPage>=totalPages)">Next</button>
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(msg))
+{
+    <div class="alert @(msgError?"alert-danger":"alert-success") mt-3">@msg</div>
+}
+
+@code {
+    [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
+    [Inject] public IConfiguration Config { get; set; } = default!;
+    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
+    private List<Row> items = new(); private bool isLoading = true; private string? error; private string? msg; private bool msgError; private int? busy;
+    private int currentPage=1; private int pageSize=10; private int total; private int totalPages; private bool? filterActive;
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load()
+    {
+        isLoading = true; error=null;
+        try
+        {
+            var client = HttpFactory.CreateClient("Api");
+            var url = $"{apiBase}/api/v1.0/Allocations?page={currentPage}&pageSize={pageSize}";
+            if (filterActive.HasValue) url += $"&isActive={filterActive.Value.ToString().ToLower()}";
+            var res = await client.GetAsync(url);
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode){ error = body; return; }
+            var doc = System.Text.Json.JsonDocument.Parse(body);
+            total = doc.RootElement.GetProperty("total").GetInt32();
+            totalPages = (int)Math.Ceiling(total/(double)pageSize);
+            items = new();
+            foreach (var el in doc.RootElement.GetProperty("items").EnumerateArray())
+                items.Add(new Row(el.GetProperty("id").GetInt32(), el.GetProperty("studentName").GetString()??"", el.GetProperty("roomNumber").GetString()??"", el.GetProperty("hostelName").GetString()??"", el.GetProperty("allocationDate").GetDateTime(), el.GetProperty("isActive").GetBoolean()));
+        }
+        catch (Exception ex){ error=ex.Message; }
+        finally{ isLoading=false; }
+    }
+    private async Task OnFilterChanged(ChangeEventArgs e)
+    {
+        var v = e.Value?.ToString();
+        filterActive = v == "active" ? true : v == "inactive" ? false : null;
+        currentPage = 1;
+        await Load();
+    }
+    private async Task Checkout(int id)
+    {
+        busy=id; msg=null;
+        try{
+            var client=HttpFactory.CreateClient("Api");
+            var res=await client.PostAsync($"{apiBase}/api/v1.0/Allocations/{id}/checkout", null);
+            var body=await res.Content.ReadAsStringAsync();
+            msg = res.IsSuccessStatusCode ? $"Checked out {id}" : body; msgError = !res.IsSuccessStatusCode;
+            if(res.IsSuccessStatusCode) await Load();
+        } catch(Exception ex){ msg=ex.Message; msgError=true; } finally{ busy=null; }
+    }
+    private async Task Prev(){ if(currentPage>1){currentPage--; await Load();} }
+    private async Task Next(){ if(currentPage<totalPages){currentPage++; await Load();} }
+    private record Row(int Id, string StudentName, string RoomNumber, string HostelName, DateTime AllocationDate, bool IsActive);
+}
+
+
+
+

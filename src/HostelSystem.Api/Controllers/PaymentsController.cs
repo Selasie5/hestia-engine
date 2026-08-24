@@ -43,7 +43,7 @@ public class PaymentsController : ControllerBase
     public record RefundRequest(int PaymentId);
 
     /// <summary>
-    /// List my payments (Student). Admin can view any via admin endpoint.
+    /// List my payments (Student).
     /// </summary>
     [HttpGet("me")]
     [Authorize]
@@ -56,6 +56,18 @@ public class PaymentsController : ControllerBase
         var payments = await _paymentRepository.GetByStudentIdAsync(student.Id, ct);
         var dtos = payments.Select(p => new { p.Id, p.Amount, Status = p.Status.ToString(), p.TransactionReference, p.PaidOn, p.DueDate, p.IsOverdue, p.PaymentMethod, p.AllocationId });
         return Ok(dtos);
+    }
+
+    /// <summary>Admin: list all payments paged.</summary>
+    [HttpGet]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? status = null, [FromQuery] string? search = null, CancellationToken ct = default)
+    {
+        page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
+        var (items, total) = await _paymentRepository.GetPagedAsync(page, pageSize, status, search, ct);
+        Response.Headers["X-Total-Count"] = total.ToString();
+        var dtos = items.Select(p => new { p.Id, p.StudentId, p.Amount, Status = p.Status.ToString(), p.TransactionReference, p.PaidOn, p.DueDate, p.IsOverdue, p.PaymentMethod });
+        return Ok(new { items = dtos, total, page, pageSize });
     }
 
     /// <summary>

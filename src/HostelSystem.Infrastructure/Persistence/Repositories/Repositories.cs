@@ -218,9 +218,32 @@ public class ApplicationRepository : IApplicationRepository
             .AsNoTracking()
             .Where(a => a.Status == Domain.Enums.ApplicationStatus.Pending)
             .Include(a => a.Student)
-            .Include(a => a.Room)
+            .Include(a => a.Room).ThenInclude(r => r.Hostel)
             .OrderBy(a => a.ApplicationDate)
             .ToListAsync(ct);
+    }
+
+    public async Task<(List<Domain.Entities.RoomApplication> Items, int TotalCount)> GetPendingPagedAsync(int page, int pageSize, CancellationToken ct = default)
+    {
+        var q = _context.RoomApplications.AsNoTracking().Where(a => a.Status == Domain.Enums.ApplicationStatus.Pending);
+        var total = await q.CountAsync(ct);
+        var items = await q.Include(a => a.Student).Include(a => a.Room).ThenInclude(r => r.Hostel).OrderBy(a => a.ApplicationDate).Skip((page-1)*pageSize).Take(pageSize).ToListAsync(ct);
+        return (items, total);
+    }
+
+    public async Task<(List<Domain.Entities.RoomApplication> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? search = null, string? status = null, CancellationToken ct = default)
+    {
+        var q = _context.RoomApplications.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<Domain.Enums.ApplicationStatus>(status, true, out var st))
+            q = q.Where(a => a.Status == st);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim();
+            q = q.Where(a => a.Student.FirstName.Contains(s) || a.Student.LastName.Contains(s) || a.Student.StudentNumber.Contains(s));
+        }
+        var total = await q.CountAsync(ct);
+        var items = await q.Include(a => a.Student).Include(a => a.Room).ThenInclude(r => r.Hostel).OrderByDescending(a => a.ApplicationDate).Skip((page-1)*pageSize).Take(pageSize).ToListAsync(ct);
+        return (items, total);
     }
 
     public async Task AddAsync(Domain.Entities.RoomApplication application, CancellationToken ct = default)
@@ -262,6 +285,15 @@ public class AllocationRepository : IAllocationRepository
     {
         return await _context.RoomAllocations
             .FirstOrDefaultAsync(a => a.ApplicationId == applicationId, ct);
+    }
+
+    public async Task<(List<RoomAllocation> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, bool? isActive = null, CancellationToken ct = default)
+    {
+        var q = _context.RoomAllocations.AsNoTracking().AsQueryable();
+        if (isActive.HasValue) q = q.Where(a => a.IsActive == isActive.Value);
+        var total = await q.CountAsync(ct);
+        var items = await q.Include(a => a.Student).Include(a => a.Room).ThenInclude(r => r.Hostel).OrderByDescending(a => a.AllocationDate).Skip((page-1)*pageSize).Take(pageSize).ToListAsync(ct);
+        return (items, total);
     }
 
     public async Task AddAsync(RoomAllocation allocation, CancellationToken ct = default)
@@ -308,6 +340,21 @@ public class PaymentRepository : IPaymentRepository
             .Where(p => p.StudentId == studentId)
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync(ct);
+    }
+
+    public async Task<(List<Payment> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? status = null, string? search = null, CancellationToken ct = default)
+    {
+        var q = _context.Payments.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<Domain.Enums.PaymentStatus>(status, true, out var st))
+            q = q.Where(p => p.Status == st);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim();
+            q = q.Where(p => p.TransactionReference != null && p.TransactionReference.Contains(s));
+        }
+        var total = await q.CountAsync(ct);
+        var items = await q.Include(p => p.Student).OrderByDescending(p => p.CreatedAt).Skip((page-1)*pageSize).Take(pageSize).ToListAsync(ct);
+        return (items, total);
     }
 
     public async Task AddAsync(Payment payment, CancellationToken ct = default)
