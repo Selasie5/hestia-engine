@@ -41,6 +41,33 @@ public class ApplicationsController : ControllerBase
         return Ok(dtos);
     }
 
+    /// <summary>Admin: pending queue paged.</summary>
+    [HttpGet("pending")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetPending([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default)
+    {
+        page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
+        var (items, total) = await _applicationRepository.GetPendingPagedAsync(page, pageSize, ct);
+        Response.Headers["X-Total-Count"] = total.ToString();
+        Response.Headers["X-Total-Pages"] = ((int)Math.Ceiling(total / (double)pageSize)).ToString();
+        var dtos = items.Select(a => new
+        {
+            a.Id, a.StudentId, studentName = a.Student?.FullName ?? a.StudentId.ToString(), studentNumber = a.Student?.StudentNumber, a.RoomId, roomNumber = a.Room?.RoomNumber, hostelName = a.Room?.Hostel?.Name, Status = a.Status.ToString(), a.ApplicationDate, a.AdditionalNotes
+        });
+        return Ok(new { items = dtos, total, page, pageSize });
+    }
+
+    /// <summary>Admin: all applications paged with optional status/search.</summary>
+    [HttpGet]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? status = null, [FromQuery] string? search = null, CancellationToken ct = default)
+    {
+        page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
+        var (items, total) = await _applicationRepository.GetPagedAsync(page, pageSize, search, status, ct);
+        Response.Headers["X-Total-Count"] = total.ToString();
+        return Ok(new { items = items.Select(a => new { a.Id, a.StudentId, studentName = a.Student?.FullName, a.RoomId, roomNumber = a.Room?.RoomNumber, Status = a.Status.ToString(), a.ApplicationDate, a.ReviewedBy }), total, page, pageSize });
+    }
+
     /// <summary>
     /// Submit a new room application.
     /// </summary>

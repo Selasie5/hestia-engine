@@ -1,0 +1,137 @@
+@page "/admin/applications"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Pending Applications — Admin</PageTitle>
+
+<h3>Pending Applications</h3>
+<div class="d-flex gap-2 mb-3">
+    <button class="btn btn-sm btn-outline-secondary" @onclick="Load">Refresh</button>
+    <span class="align-self-center text-muted">Page @currentPage / @totalPages (total @total)</span>
+</div>
+
+@if (isLoading)
+{
+    <p>Loading...</p>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (items.Count == 0)
+{
+    <div class="alert alert-info">No pending applications.</div>
+}
+else
+{
+    <table class="table table-sm">
+        <thead><tr><th>#</th><th>Student</th><th>Room</th><th>Date</th><th>Notes</th><th>Action</th></tr></thead>
+        <tbody>
+            @foreach (var a in items)
+            {
+                <tr>
+                    <td>@a.Id</td>
+                    <td>@a.StudentName <small class="text-muted">(@a.StudentNumber)</small></td>
+                    <td>@a.RoomNumber <small class="text-muted">(@a.HostelName)</small></td>
+                    <td>@a.ApplicationDate.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                    <td><small>@(a.AdditionalNotes ?? "-")</small></td>
+                    <td>
+                        <button class="btn btn-sm btn-success" @onclick="() => Approve(a.Id)" disabled="@(busy==a.Id)">Approve</button>
+                        <button class="btn btn-sm btn-danger ms-1" @onclick="() => PromptReject(a.Id)">Reject</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Prev" disabled="@(currentPage<=1)">Prev</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Next" disabled="@(currentPage>=totalPages)">Next</button>
+    </div>
+}
+
+@if (showReject)
+{
+    <div class="card mt-3" style="max-width:480px">
+        <div class="card-body">
+            <h6>Reject @rejectId</h6>
+            <input class="form-control mb-2" @bind="rejectReason" placeholder="Reason required" />
+            <button class="btn btn-sm btn-danger" @onclick="Reject" disabled="@(string.IsNullOrWhiteSpace(rejectReason) || busy==rejectId)">Confirm Reject</button>
+            <button class="btn btn-sm btn-outline-secondary ms-1" @onclick="() => showReject=false">Cancel</button>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(msg))
+{
+    <div class="alert @(msgError?"alert-danger":"alert-success") mt-3">@msg</div>
+}
+
+@code {
+    [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
+    [Inject] public IConfiguration Config { get; set; } = default!;
+    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
+    private List<Row> items = new(); private bool isLoading = true; private string? error; private string? msg; private bool msgError; private int? busy;
+    private int currentPage = 1; private int pageSize = 10; private int total; private int totalPages;
+    private bool showReject; private int rejectId; private string rejectReason = "";
+
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load()
+    {
+        isLoading = true; error = null;
+        try
+        {
+            var client = HttpFactory.CreateClient("Api");
+            var res = await client.GetAsync($"{apiBase}/api/v1.0/Applications/pending?page={currentPage}&pageSize={pageSize}");
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode) { error = body; return; }
+            var doc = System.Text.Json.JsonDocument.Parse(body);
+            total = doc.RootElement.GetProperty("total").GetInt32();
+            totalPages = (int)Math.Ceiling(total / (double)pageSize);
+            items = new();
+            foreach (var el in doc.RootElement.GetProperty("items").EnumerateArray())
+                items.Add(new Row(el.GetProperty("id").GetInt32(), el.GetProperty("studentName").GetString()??"", el.GetProperty("studentNumber").GetString()??"", el.GetProperty("roomNumber").GetString()??"", el.GetProperty("hostelName").GetString()??"", el.GetProperty("applicationDate").GetDateTime(), el.TryGetProperty("additionalNotes", out var n) && n.ValueKind!= System.Text.Json.JsonValueKind.Null ? n.GetString() : null));
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { isLoading = false; }
+    }
+    private async Task Approve(int id)
+    {
+        busy = id; msg = null;
+        try
+        {
+            var client = HttpFactory.CreateClient("Api");
+            var res = await client.PostAsJsonAsync($"{apiBase}/api/v1.0/Applications/{id}/approve", new { applicationId = id, reviewedBy = "admin" });
+            var body = await res.Content.ReadAsStringAsync();
+            msg = res.IsSuccessStatusCode ? $"Approved {id}" : body; msgError = !res.IsSuccessStatusCode;
+            if (res.IsSuccessStatusCode) await Load();
+            if ((int)res.StatusCode == 409) msg = "Conflict: room version/occupancy changed — refresh.";
+        }
+        catch (Exception ex) { msg = ex.Message; msgError = true; }
+        finally { busy = null; }
+    }
+    private void PromptReject(int id) { rejectId = id; rejectReason = ""; showReject = true; }
+    private async Task Reject()
+    {
+        busy = rejectId; msg = null;
+        try
+        {
+            var client = HttpFactory.CreateClient("Api");
+            var res = await client.PostAsJsonAsync($"{apiBase}/api/v1.0/Applications/{rejectId}/reject", new { reason = rejectReason });
+            var body = await res.Content.ReadAsStringAsync();
+            msg = res.IsSuccessStatusCode ? $"Rejected {rejectId}" : body; msgError = !res.IsSuccessStatusCode;
+            if (res.IsSuccessStatusCode) { showReject = false; await Load(); }
+        }
+        catch (Exception ex) { msg = ex.Message; msgError = true; }
+        finally { busy = null; }
+    }
+    private async Task Prev() { if (currentPage>1){ currentPage--; await Load(); } }
+    private async Task Next() { if (currentPage<totalPages){ currentPage++; await Load(); } }
+
+    private record Row(int Id, string StudentName, string StudentNumber, string RoomNumber, string HostelName, DateTime ApplicationDate, string? AdditionalNotes);
+}
+
+
+
+

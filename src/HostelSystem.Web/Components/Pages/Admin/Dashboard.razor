@@ -1,0 +1,108 @@
+@page "/admin"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Admin Dashboard — HostelSystem</PageTitle>
+
+<h3>Admin Dashboard</h3>
+<button class="btn btn-sm btn-outline-secondary mb-3" @onclick="Load">Refresh</button>
+
+@if (isLoading)
+{
+    <p>Loading KPIs...</p>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="card text-center"><div class="card-body"><h5>@kpi.Hostels</h5><small>Hostels</small></div></div></div>
+        <div class="col-md-3"><div class="card text-center border-warning"><div class="card-body"><h5>@kpi.PendingApps</h5><small>Pending Apps</small></div></div></div>
+        <div class="col-md-3"><div class="card text-center border-success"><div class="card-body"><h5>@kpi.ActiveAllocations</h5><small>Active Allocations</small></div></div></div>
+        <div class="col-md-3"><div class="card text-center border-primary"><div class="card-body"><h5>GHS @kpi.Revenue</h5><small>Revenue (Completed)</small></div></div></div>
+    </div>
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="card text-center"><div class="card-body"><h5>@kpi.TotalPayments</h5><small>Total Payments</small></div></div></div>
+        <div class="col-md-3"><div class="card text-center"><div class="card-body"><h5>@kpi.Overdue</h5><small>Overdue (Pending)</small></div></div></div>
+    </div>
+
+    <h5>Recent Pending Applications</h5>
+    @if (recent.Count == 0)
+    {
+        <div class="alert alert-info">No pending applications.</div>
+    }
+    else
+    {
+        <table class="table table-sm">
+            <thead><tr><th>#</th><th>Student</th><th>Room</th><th>Date</th><th>Action</th></tr></thead>
+            <tbody>
+                @foreach (var a in recent)
+                {
+                    <tr><td>@a.Id</td><td>@a.StudentName (@a.StudentNumber)</td><td>@a.RoomNumber (@a.HostelName)</td><td>@a.ApplicationDate.ToLocalTime().ToString("MM-dd")</td><td><a class="btn btn-sm btn-outline-primary" href="/admin/applications">Manage</a></td></tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
+    [Inject] public IConfiguration Config { get; set; } = default!;
+    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
+    private bool isLoading = true; private string? error;
+    private Kpi kpi = new(0,0,0,0,0,0);
+    private List<RecentApp> recent = new();
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load()
+    {
+        isLoading = true; error = null;
+        try
+        {
+            var client = HttpFactory.CreateClient("Api");
+            // parallel
+            var hostelsTask = client.GetAsync($"{apiBase}/api/v1.0/Hostels?onlyActive=false&page=1&pageSize=1");
+            var pendingTask = client.GetAsync($"{apiBase}/api/v1.0/Applications/pending?page=1&pageSize=5");
+            var allocsTask = client.GetAsync($"{apiBase}/api/v1.0/Allocations?page=1&pageSize=1");
+            var paysTask = client.GetAsync($"{apiBase}/api/v1.0/Payments?page=1&pageSize=100");
+            var paysCompTask = client.GetAsync($"{apiBase}/api/v1.0/Payments?status=Completed&page=1&pageSize=100");
+            await Task.WhenAll(hostelsTask, pendingTask, allocsTask, paysTask, paysCompTask);
+
+            int hostels = 0, pending = 0, allocs = 0, pays = 0, over = 0; decimal rev = 0;
+            if (hostelsTask.Result.IsSuccessStatusCode)
+                hostels = int.Parse(hostelsTask.Result.Headers.TryGetValues("X-Total-Count", out var h) ? h.First() : "0");
+            if (pendingTask.Result.IsSuccessStatusCode)
+            {
+                var body = await pendingTask.Result.Content.ReadAsStringAsync();
+                var doc = System.Text.Json.JsonDocument.Parse(body);
+                pending = doc.RootElement.GetProperty("total").GetInt32();
+                if (doc.RootElement.TryGetProperty("items", out var items))
+                    foreach (var el in items.EnumerateArray())
+                        recent.Add(new RecentApp(el.GetProperty("id").GetInt32(), el.GetProperty("studentName").GetString()??"", el.GetProperty("studentNumber").GetString()??"", el.GetProperty("roomNumber").GetString()??"", el.GetProperty("hostelName").GetString()??"", el.GetProperty("applicationDate").GetDateTime()));
+            }
+            if (allocsTask.Result.IsSuccessStatusCode)
+                allocs = int.Parse(allocsTask.Result.Headers.TryGetValues("X-Total-Count", out var ac) ? ac.First() : "0");
+            if (paysTask.Result.IsSuccessStatusCode)
+                pays = int.Parse(paysTask.Result.Headers.TryGetValues("X-Total-Count", out var pc) ? pc.First() : "0");
+            if (paysCompTask.Result.IsSuccessStatusCode)
+            {
+                var b = await paysCompTask.Result.Content.ReadAsStringAsync();
+                var d = System.Text.Json.JsonDocument.Parse(b);
+                if (d.RootElement.TryGetProperty("items", out var its))
+                    foreach (var el in its.EnumerateArray())
+                        rev += el.GetProperty("amount").GetDecimal();
+                // also fetch overdue estimate via client? for now keep 0
+            }
+            kpi = new Kpi(hostels, pending, allocs, rev, pays, over);
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { isLoading = false; }
+    }
+    private record Kpi(int Hostels, int PendingApps, int ActiveAllocations, decimal Revenue, int TotalPayments, int Overdue);
+    private record RecentApp(int Id, string StudentName, string StudentNumber, string RoomNumber, string HostelName, DateTime ApplicationDate);
+}
+
+
+

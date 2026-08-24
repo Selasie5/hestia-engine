@@ -1,0 +1,107 @@
+@page "/admin/hostels"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Hostels Admin — HostelSystem</PageTitle>
+
+<h3>Hostels — Admin</h3>
+
+<div class="card mb-3" style="max-width:560px">
+    <div class="card-body">
+        <h6>Create Hostel</h6>
+        <input class="form-control mb-2" @bind="newName" placeholder="Name" />
+        <input class="form-control mb-2" @bind="newAddress" placeholder="Address" />
+        <input class="form-control mb-2" @bind="newDesc" placeholder="Description (optional)" />
+        <button class="btn btn-sm btn-primary" @onclick="Create" disabled="@busy">Create</button>
+    </div>
+</div>
+
+<button class="btn btn-sm btn-outline-secondary mb-2" @onclick="Load">Refresh</button>
+@if (isLoading)
+{
+    <p>Loading...</p>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+else
+{
+    <table class="table table-sm">
+        <thead><tr><th>#</th><th>Name</th><th>Address</th><th>Active</th><th>Rooms</th><th>Action</th></tr></thead>
+        <tbody>
+            @foreach (var h in items)
+            {
+                <tr>
+                    <td>@h.Id</td>
+                    <td>@h.Name</td>
+                    <td><small>@h.Address</small></td>
+                    <td><span class="badge @(h.IsActive?"bg-success":"bg-warning")">@(h.IsActive?"Active":"Inactive")</span></td>
+                    <td>@h.TotalCapacity / @h.AvailableSpots avail</td>
+                    <td>
+                        @if (h.IsActive)
+                        {
+                            <button class="btn btn-sm btn-outline-warning" @onclick="() => Deactivate(h.Id)">Deactivate</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-outline-success" @onclick="() => Activate(h.Id)">Activate</button>
+                        }
+                        <a class="btn btn-sm btn-outline-primary ms-1" href="/hostels/@h.Id">Rooms</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+@if (!string.IsNullOrWhiteSpace(msg))
+{
+    <div class="alert @(msgError?"alert-danger":"alert-success")">@msg</div>
+}
+
+@code {
+    [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
+    [Inject] public IConfiguration Config { get; set; } = default!;
+    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
+    private List<Row> items = new(); private bool isLoading = true; private string? error; private string? msg; private bool msgError; private bool busy;
+    private string newName=""; private string newAddress=""; private string newDesc="";
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load()
+    {
+        isLoading=true;
+        try{
+            var client=HttpFactory.CreateClient("Api");
+            var res=await client.GetAsync($"{apiBase}/api/v1.0/Hostels?onlyActive=false&page=1&pageSize=50");
+            var body=await res.Content.ReadAsStringAsync();
+            if(!res.IsSuccessStatusCode){ error=body; return; }
+            var doc=System.Text.Json.JsonDocument.Parse(body);
+            var arr = doc.RootElement.TryGetProperty("items", out var it) ? it : doc.RootElement;
+            items=new();
+            if (arr.ValueKind== System.Text.Json.JsonValueKind.Array)
+                foreach(var el in arr.EnumerateArray()) items.Add(Parse(el));
+            else if (doc.RootElement.TryGetProperty("items", out var its2))
+                foreach(var el in its2.EnumerateArray()) items.Add(Parse(el));
+            else
+                foreach(var el in doc.RootElement.EnumerateArray()) items.Add(Parse(el));
+        } catch(Exception ex){ error=ex.Message; } finally{ isLoading=false; }
+    }
+    private Row Parse(System.Text.Json.JsonElement el) => new Row(el.GetProperty("id").GetInt32(), el.GetProperty("name").GetString()??"", el.TryGetProperty("address", out var a)?a.GetString()??"":"", el.GetProperty("isActive").GetBoolean(), el.GetProperty("totalCapacity").GetInt32(), el.GetProperty("availableSpots").GetInt32());
+    private async Task Create()
+    {
+        busy=true; msg=null;
+        try{
+            var client=HttpFactory.CreateClient("Api");
+            var res=await client.PostAsJsonAsync($"{apiBase}/api/v1.0/Hostels", new { name = newName, address = newAddress, description = string.IsNullOrWhiteSpace(newDesc)? null : newDesc });
+            var b=await res.Content.ReadAsStringAsync(); msg=b; msgError=!res.IsSuccessStatusCode;
+            if(res.IsSuccessStatusCode){ newName=""; newAddress=""; newDesc=""; await Load(); }
+        } catch(Exception ex){ msg=ex.Message; msgError=true; } finally{ busy=false; }
+    }
+    private async Task Deactivate(int id){ var c=HttpFactory.CreateClient("Api"); var r=await c.PostAsync($"{apiBase}/api/v1.0/Hostels/{id}/deactivate", null); msg=await r.Content.ReadAsStringAsync(); msgError=!r.IsSuccessStatusCode; if(r.IsSuccessStatusCode) await Load(); }
+    private async Task Activate(int id){ var c=HttpFactory.CreateClient("Api"); var r=await c.PostAsync($"{apiBase}/api/v1.0/Hostels/{id}/activate", null); msg=await r.Content.ReadAsStringAsync(); msgError=!r.IsSuccessStatusCode; if(r.IsSuccessStatusCode) await Load(); }
+    private record Row(int Id, string Name, string Address, bool IsActive, int TotalCapacity, int AvailableSpots);
+}
+
+
+
