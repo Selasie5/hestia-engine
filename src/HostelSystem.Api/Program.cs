@@ -111,15 +111,28 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
-// ─── Seed development data (idempotent — skips if data exists) ───
-if (app.Environment.IsDevelopment())
+// ─── Seed / Reset (dev + CLI) ───
+bool shouldReset = args.Contains("--seed-reset", StringComparer.OrdinalIgnoreCase);
+bool shouldSeed = shouldReset || app.Environment.IsDevelopment();
+
+if (shouldSeed)
 {
     using var scope = app.Services.CreateScope();
     var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
-    await seeder.SeedAsync();
+    if (shouldReset)
+        await seeder.ResetAsync();
+    else
+        await seeder.SeedAsync();
 
-     var identitySeeder = scope.ServiceProvider.GetRequiredService<IdentitySeeder>();
+    var identitySeeder = scope.ServiceProvider.GetRequiredService<IdentitySeeder>();
     await identitySeeder.SeedAsync();
+
+    // If invoked only for reset, exit after seeding (useful for CI / docker entrypoint)
+    if (args.Contains("--seed-reset-only", StringComparer.OrdinalIgnoreCase))
+    {
+        Console.WriteLine("Seed reset complete — exiting as --seed-reset-only was specified.");
+        return;
+    }
 }
 
 app.Run();

@@ -5,6 +5,7 @@ services:
       - "8080:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - DatabaseProvider=Sqlite
       - ConnectionStrings__DefaultConnection=Data Source=/data/hostelsystem.db
       - Jwt__Secret=DEV-SECRET-KEY-CHANGE-IN-PRODUCTION-AT-LEAST-32-CHARS!!
       - Jwt__Issuer=HostelSystem.Api
@@ -12,5 +13,25 @@ services:
     volumes:
       - sqlite-data:/data
 
+  # ── Production profile: SQL Server (activate with --profile prod) ──
+  # Run: docker compose --profile prod up
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    profiles: ["prod"]
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong!Passw0rd
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong!Passw0rd' -C -Q 'SELECT 1' || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong!Passw0rd' -Q 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   sqlite-data:
+  mssql-data:

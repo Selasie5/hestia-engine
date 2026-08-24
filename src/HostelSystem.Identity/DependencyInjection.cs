@@ -14,9 +14,30 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection");
+        var provider = configuration["DatabaseProvider"]
+                       ?? configuration["Database:Provider"]
+                       ?? Environment.GetEnvironmentVariable("DATABASE_PROVIDER")
+                       ?? "Sqlite";
 
         services.AddDbContext<AppIdentityDbContext>(options =>
-            options.UseSqlite(connectionString));
+        {
+            if (provider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Sql_Server", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("mssql", StringComparison.OrdinalIgnoreCase))
+            {
+                options.UseSqlServer(connectionString, sqlOptions =>
+                {
+                    sqlOptions.EnableRetryOnFailure(
+                        maxRetryCount: 5,
+                        maxRetryDelay: TimeSpan.FromSeconds(10),
+                        errorNumbersToAdd: null);
+                });
+            }
+            else
+            {
+                options.UseSqlite(connectionString);
+            }
+        });
 
         services.AddIdentity<ApplicationUser, IdentityRole>(options =>
         {
