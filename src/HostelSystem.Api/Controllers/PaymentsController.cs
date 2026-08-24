@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using HostelSystem.Application.Commands.Payments;
@@ -17,6 +18,7 @@ public class PaymentsController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly IPaymentRepository _paymentRepository;
+    private readonly IStudentRepository _studentRepository;
     private readonly IQrCodeService _qrCodeService;
     private readonly PaystackSettings _paystackSettings;
     private readonly ILogger<PaymentsController> _logger;
@@ -24,12 +26,14 @@ public class PaymentsController : ControllerBase
     public PaymentsController(
         IMediator mediator,
         IPaymentRepository paymentRepository,
+        IStudentRepository studentRepository,
         IQrCodeService qrCodeService,
         IOptions<PaystackSettings> paystackOptions,
         ILogger<PaymentsController> logger)
     {
         _mediator = mediator;
         _paymentRepository = paymentRepository;
+        _studentRepository = studentRepository;
         _qrCodeService = qrCodeService;
         _paystackSettings = paystackOptions.Value;
         _logger = logger;
@@ -39,7 +43,23 @@ public class PaymentsController : ControllerBase
     public record RefundRequest(int PaymentId);
 
     /// <summary>
-    /// Initiate a payment — returns Paystack authorization URL.
+    /// List my payments (Student). Admin can view any via admin endpoint.
+    /// </summary>
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> GetMy(CancellationToken ct)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (string.IsNullOrWhiteSpace(userId)) return Unauthorized(new { error = "Invalid token." });
+        var student = await _studentRepository.GetByUserIdAsync(userId, ct);
+        if (student is null) return NotFound(new { error = "Student profile not found." });
+        var payments = await _paymentRepository.GetByStudentIdAsync(student.Id, ct);
+        var dtos = payments.Select(p => new { p.Id, p.Amount, Status = p.Status.ToString(), p.TransactionReference, p.PaidOn, p.DueDate, p.IsOverdue, p.PaymentMethod, p.AllocationId });
+        return Ok(dtos);
+    }
+
+    /// <summary>
+    /// Initiate a payment — returns Paystack authorization URL. Verifies Student owns the payment.
     /// </summary>
     [HttpPost("initiate")]
     [Authorize]
@@ -47,6 +67,16 @@ public class PaymentsController : ControllerBase
     {
         if (request.PaymentId <= 0 || string.IsNullOrWhiteSpace(request.Email))
             return BadRequest(new { error = "PaymentId and Email are required." });
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        var isAdmin = User.IsInRole("Admin");
+        if (!isAdmin && !string.IsNullOrWhiteSpace(userId))
+        {
+            var student = await _studentRepository.GetByUserIdAsync(userId, ct);
+            var pay = await _paymentRepository.GetByIdAsync(request.PaymentId, ct);
+            if (student is null || pay is null || pay.StudentId != student.Id)
+                return Forbid();
+        }
 
         var cmd = new InitiatePaymentCommand(request.PaymentId, request.Email, request.CallbackUrl);
         var result = await _mediator.Send(cmd, ct);

@@ -1,10 +1,67 @@
 @page "/payments"
 @rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
 
 <PageTitle>Payments — HostelSystem</PageTitle>
 
 <h3>Payments</h3>
-<p class="text-muted">Initiate a payment with Paystack or view a QR code for your allocation.</p>
+<p class="text-muted">Your payments history • Initiate via Paystack or scan QR.</p>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">My Payments</h5>
+        <button class="btn btn-sm btn-outline-secondary mb-2" @onclick="LoadHistory">Refresh</button>
+        @if (historyLoading)
+        {
+            <p>Loading...</p>
+        }
+        else if (!string.IsNullOrWhiteSpace(historyError))
+        {
+            <div class="alert alert-warning">@historyError</div>
+        }
+        else if (history.Count == 0)
+        {
+            <div class="alert alert-info">No payments yet. Apply and get approved — a payment will appear automatically.</div>
+        }
+        else
+        {
+            <table class="table table-sm">
+                <thead><tr><th>#</th><th>Amount</th><th>Status</th><th>Reference</th><th>Due</th><th>Action</th></tr></thead>
+                <tbody>
+                    @foreach (var p in history)
+                    {
+                        <tr>
+                            <td>@p.Id</td>
+                            <td>GHS @p.Amount</td>
+                            <td><span class="badge bg-@(p.Status=="Completed"?"success":p.Status=="Pending"?"warning text-dark":p.Status=="Refunded"?"info":"secondary")">@p.Status</span></td>
+                            <td><code>@(p.TransactionReference ?? "-")</code></td>
+                            <td>@p.DueDate.ToLocalTime().ToString("yyyy-MM-dd") @(p.IsOverdue ? "(overdue)" : "")</td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(p.TransactionReference))
+                                {
+                                    <a class="btn btn-sm btn-outline-primary" href="/payments/@p.TransactionReference">QR</a>
+                                    @if (p.Status=="Pending")
+                                    {
+                                        <button class="btn btn-sm btn-outline-success ms-1" @onclick="() => Verify(p.TransactionReference!)">Verify</button>
+                                    }
+                                }
+                                else if (p.Status=="Pending")
+                                {
+                                    <small class="text-muted">Initiate below</small>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        @if (!string.IsNullOrWhiteSpace(verifyMsg))
+        {
+            <div class="alert @(verifyError?"alert-danger":"alert-success")">@verifyMsg</div>
+        }
+    </div>
+</div>
 
 <div class="card mb-4" style="max-width:560px">
     <div class="card-body">
@@ -70,6 +127,42 @@
     private bool isError;
     private bool isSubmitting;
     private InitiateResult? lastResult;
+
+    private List<PaymentRow> history = new();
+    private bool historyLoading = true;
+    private string? historyError;
+    private string? verifyMsg; private bool verifyError;
+
+    protected override async Task OnInitializedAsync() => await LoadHistory();
+    private async Task LoadHistory()
+    {
+        historyLoading = true; historyError = null;
+        try
+        {
+            var client = HttpFactory.CreateClient("Api");
+            var res = await client.GetAsync($"{apiBase}/api/v1.0/Payments/me");
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode) { historyError = body; return; }
+            history = System.Text.Json.JsonSerializer.Deserialize<List<PaymentRow>>(body, new System.Text.Json.JsonSerializerOptions{ PropertyNameCaseInsensitive = true }) ?? new();
+        }
+        catch (Exception ex) { historyError = ex.Message; }
+        finally { historyLoading = false; }
+    }
+    private async Task Verify(string reference)
+    {
+        verifyMsg = null; verifyError = false;
+        try
+        {
+            var client = HttpFactory.CreateClient("Api");
+            var res = await client.GetAsync($"{apiBase}/api/v1.0/Payments/{reference}/verify");
+            var body = await res.Content.ReadAsStringAsync();
+            verifyMsg = res.IsSuccessStatusCode ? $"Verified: {body}" : body;
+            verifyError = !res.IsSuccessStatusCode;
+            if (res.IsSuccessStatusCode) await LoadHistory();
+        }
+        catch (Exception ex) { verifyMsg = ex.Message; verifyError = true; }
+    }
+    private record PaymentRow(int Id, decimal Amount, string Status, string? TransactionReference, DateTime? PaidOn, DateTime DueDate, bool IsOverdue);
 
     private async Task Initiate()
     {
