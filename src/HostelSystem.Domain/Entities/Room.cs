@@ -89,4 +89,23 @@ public class Room : Entity
         PricePerSemester = newPrice;
         SetUpdated();
     }
+
+    public void UpdateDetails(string roomNumber, int capacity, decimal pricePerSemester)
+    {
+        if (string.IsNullOrWhiteSpace(roomNumber))
+            throw new BusinessRuleViolationException("Room number cannot be empty.");
+        if (capacity <= 0)
+            throw new BusinessRuleViolationException("Capacity must be greater than zero.");
+        if (pricePerSemester <= 0)
+            throw new BusinessRuleViolationException("Price must be greater than zero.");
+        if (capacity < CurrentOccupancy)
+            throw new BusinessRuleViolationException($"Cannot set capacity {capacity} below current occupancy {CurrentOccupancy}.");
+
+        RoomNumber = roomNumber;
+        Capacity = capacity;
+        PricePerSemester = pricePerSemester;
+        // Re-evaluate availability based on new capacity
+        IsAvailable = CurrentOccupancy < Capacity;
+        SetUpdated();
+    }
 }
