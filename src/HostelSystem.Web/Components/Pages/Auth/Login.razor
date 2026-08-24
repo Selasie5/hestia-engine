@@ -38,7 +38,8 @@
 
     <div class="auth-divider"><span>New to Hestia?</span></div>
     <a class="btn btn-outline-secondary w-100" href="/register">Create a student account</a>
-    <p class="auth-home-link"><a href="/">← Back to home</a></p>
+    <p class="auth-home-link"><a href="/">← Back to home</a> • <a href="/logout">Clear session / Sign out</a></p>
+    <p class="small text-muted">If you see 401 on <code>GET /Students/me</code>, your token is stale — click Clear session, then sign in again. Check F12 → Application → Local Storage.</p>
 </section>
 
 @code {
@@ -61,6 +62,7 @@
         busy = false;
         if (!ok) { error = err; return; }
         info = "Signed in successfully. Redirecting…";
-        Nav.NavigateTo("/", forceLoad: false);
+        // forceLoad ensures circuit restarts and ProtectedLocalStorage JWT is read as authenticated (fixes stale ProtectedLocalStorage vs HTTP challenge mismatch)
+        Nav.NavigateTo("/", forceLoad: true);
     }
 }
