@@ -101,24 +101,66 @@ else
 
     private async Task Apply(int roomId)
     {
-        applyBusy = roomId; applyMsg = null; applyError = false;
+        applyBusy = roomId; applyMsg = "Submitting..."; applyError = false;
         try
         {
             var client = HttpFactory.CreateClient("Api");
-            // Need studentId: GET /Students/me
+            // 1) resolve studentId from JWT (requires sign-in)
             var meRes = await client.GetAsync($"{apiBase}/api/v1.0/Students/me");
-            if (!meRes.IsSuccessStatusCode) { applyMsg = await meRes.Content.ReadAsStringAsync(); applyError = true; return; }
             var meBody = await meRes.Content.ReadAsStringAsync();
+            if (!meRes.IsSuccessStatusCode)
+            {
+                if ((int)meRes.StatusCode == 401) applyMsg = "Please sign in first (session expired). Go to Login.";
+                else if ((int)meRes.StatusCode == 404) applyMsg = "Student profile not found — register again or contact admin.";
+                else applyMsg = $"Cannot load profile ({(int)meRes.StatusCode}): {ExtractError(meBody)}";
+                applyError = true; return;
+            }
             using var doc = System.Text.Json.JsonDocument.Parse(meBody);
-            var studentId = doc.RootElement.GetProperty("student").GetProperty("id").GetInt32();
-            var payload = new { studentId = studentId, roomId = roomId };
+            if (!doc.RootElement.TryGetProperty("student", out var st) || !st.TryGetProperty("id", out var idEl))
+            { applyMsg = "Invalid profile response."; applyError = true; return; }
+            var studentId = idEl.GetInt32();
+
+            // 2) submit application (API validates: no pending, not allocated, room available)
+            var payload = new { StudentId = studentId, RoomId = roomId };
             var res = await client.PostAsJsonAsync($"{apiBase}/api/v1.0/Applications", payload);
             var body = await res.Content.ReadAsStringAsync();
-            if (!res.IsSuccessStatusCode) { applyMsg = body; applyError = true; }
-            else { applyMsg = $"Applied! {body}"; applyError = false; }
+            if (!res.IsSuccessStatusCode)
+            {
+                applyMsg = $"Apply failed ({(int)res.StatusCode}): {ExtractError(body)}";
+                applyError = true;
+                // surface common 400 details
+                if (body.Contains("already have a pending", StringComparison.OrdinalIgnoreCase))
+                    applyMsg += " — check My Applications.";
+                if (body.Contains("already allocated", StringComparison.OrdinalIgnoreCase))
+                    applyMsg += " — you already have a room.";
+                return;
+            }
+            applyMsg = "Applied! Check My Applications for status.";
+            applyError = false;
+            // refresh available rooms (occupancy may not change until approved, but still)
+            await OnParametersSetAsync();
         }
-        catch (Exception ex) { applyMsg = ex.Message; applyError = true; }
+        catch (Exception ex)
+        {
+            applyMsg = $"Error: {ex.Message}";
+            applyError = true;
+            Console.WriteLine($"Apply error for room {roomId}: {ex}");
+        }
         finally { applyBusy = null; }
+    }
+
+    private static string ExtractError(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return "(empty response)";
+        try
+        {
+            using var d = System.Text.Json.JsonDocument.Parse(json);
+            if (d.RootElement.TryGetProperty("error", out var e) && e.ValueKind == System.Text.Json.JsonValueKind.String) return e.GetString()!;
+            if (d.RootElement.TryGetProperty("title", out var t) && t.ValueKind == System.Text.Json.JsonValueKind.String) return t.GetString()!;
+            if (d.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object && d.RootElement.TryGetProperty("value", out var v))
+                return v.ToString();
+        } catch {}
+        return json.Length > 300 ? json[..300] : json;
     }
 
     private record HostelDto(int Id, string Name, string? Description, string Address, bool IsActive, int TotalCapacity, int TotalOccupancy, int AvailableSpots);
