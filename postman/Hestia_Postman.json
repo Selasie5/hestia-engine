@@ -1,0 +1,94 @@
+{
+  "info": {
+    "name": "Hestia — Hostel Allocation (v1.0)",
+    "description": "Auth, Hostels, Rooms, Applications, Allocations, Students, Payments + QR. Set baseUrl and accessToken vars. See README.",
+    "_postman_id": "hestia-postman-collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "accessToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1.0/Auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\":\"student@example.com\",\"password\":\"P@ssw0rd123!\",\"firstName\":\"Kwame\",\"lastName\":\"Mensah\",\"studentNumber\":\"UG20240999\",\"gender\":\"Male\"}" }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1.0/Auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\":\"student@example.com\",\"password\":\"P@ssw0rd123!\"}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["var j = pm.response.json(); pm.environment.set('accessToken', j.accessToken || j.AccessToken);"] } }]
+        },
+        { "name": "Refresh", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1.0/Auth/refresh", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"refreshToken\":\"<from login>\"}" } } },
+        { "name": "Health", "request": { "method": "GET", "url": "{{baseUrl}}/health" } }
+      ]
+    },
+    {
+      "name": "Hostels",
+      "item": [
+        { "name": "List (public)", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1.0/Hostels?onlyActive=false&page=1&pageSize=20" } },
+        { "name": "Get by Id", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1.0/Hostels/1" } },
+        { "name": "Create (Admin)", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1.0/Hostels", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{accessToken}}" }], "body": { "mode": "raw", "raw": "{\"name\":\"New Hall\",\"address\":\"Legon\",\"description\":\"Test\"}" } } }
+      ]
+    },
+    {
+      "name": "Rooms",
+      "item": [
+        { "name": "Available by Hostel", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1.0/Rooms/available/1" } },
+        { "name": "List filtered", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1.0/Rooms?hostelId=1&isAvailable=true&search=A&page=1&pageSize=20" } },
+        { "name": "Create (Admin)", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1.0/Rooms", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{accessToken}}" }], "body": { "mode": "raw", "raw": "{\"roomNumber\":\"X101\",\"capacity\":2,\"pricePerSemester\":1800,\"hostelId\":1}" } } },
+        { "name": "Update (Admin)", "request": { "method": "PUT", "url": "{{baseUrl}}/api/v1.0/Rooms/1", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{accessToken}}" }], "body": { "mode": "raw", "raw": "{\"id\":1,\"roomNumber\":\"X101\",\"capacity\":2,\"pricePerSemester\":1900,\"version\":\"00000000-0000-0000-0000-000000000000\"}" } } }
+      ]
+    },
+    {
+      "name": "Applications",
+      "item": [
+        { "name": "Submit", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1.0/Applications", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{accessToken}}" }], "body": { "mode": "raw", "raw": "{\"studentId\":1,\"roomId\":1,\"additionalNotes\":\"Ground floor please\"}" } } },
+        { "name": "My Applications", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1.0/Applications/me", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }] } },
+        { "name": "Pending (Admin)", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1.0/Applications/pending?page=1&pageSize=10", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }] } },
+        { "name": "Approve (Admin)", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1.0/Applications/1/approve", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{accessToken}}" }], "body": { "mode": "raw", "raw": "{\"applicationId\":1,\"reviewedBy\":\"admin\"}" } } },
+        { "name": "Reject (Admin)", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1.0/Applications/1/reject", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{accessToken}}" }], "body": { "mode": "raw", "raw": "{\"reason\":\"Capacity full\"}" } } },
+        { "name": "Cancel (Student)", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1.0/Applications/1/cancel", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{accessToken}}" }], "body": { "mode": "raw", "raw": "{\"reason\":\"Changed mind\"}" } } }
+      ]
+    },
+    {
+      "name": "Allocations",
+      "item": [
+        { "name": "My Allocation", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1.0/Allocations/me", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }] } },
+        { "name": "List (Admin)", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1.0/Allocations?page=1&pageSize=20&isActive=true", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }] } },
+        { "name": "Checkout", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1.0/Allocations/1/checkout", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }] } }
+      ]
+    },
+    {
+      "name": "Students",
+      "item": [
+        { "name": "Me", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1.0/Students/me", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }] } }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        { "name": "Me", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1.0/Payments/me", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }] } },
+        { "name": "Initiate", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1.0/Payments/initiate", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{accessToken}}" }], "body": { "mode": "raw", "raw": "{\"paymentId\":1,\"email\":\"student@example.com\"}" }, "description": "Returns transactionReference + authorizationUrl" } },
+        { "name": "Verify", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1.0/Payments/HS-1-20260825-ABCD/verify", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }] } },
+        { "name": "QR PNG", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1.0/Payments/HS-1-20260825-ABCD/qr?format=png", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }] } },
+        { "name": "QR SVG", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1.0/Payments/HS-1-20260825-ABCD/qr?format=svg", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }] } },
+        { "name": "Refund (Admin)", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1.0/Payments/refund", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{accessToken}}" }], "body": { "mode": "raw", "raw": "{\"paymentId\":1}" } } },
+        { "name": "Webhook (Paystack, sig: x-paystack-signature)", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1.0/Payments/webhook", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "x-paystack-signature", "value": "HMAC-SHA512 of raw body with Paystack secret" }], "body": { "mode": "raw", "raw": "{\"event\":\"charge.success\",\"data\":{\"reference\":\"HS-1-20260825-ABCD\",\"status\":\"success\"}}" } } }
+      ]
+    }
+  ]
+}
