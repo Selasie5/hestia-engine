@@ -1,6 +1,8 @@
 services:
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
@@ -10,8 +12,33 @@ services:
       - Jwt__Secret=DEV-SECRET-KEY-CHANGE-IN-PRODUCTION-AT-LEAST-32-CHARS!!
       - Jwt__Issuer=HostelSystem.Api
       - Jwt__Audience=HostelSystem.Web
+      - Paystack__SecretKey=${PAYSTACK_SECRET_KEY:-}
+      - Paystack__PublicKey=${PAYSTACK_PUBLIC_KEY:-}
     volumes:
       - sqlite-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || wget -qO- http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ApiBaseUrl=http://api:8080
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || wget -qO- http://localhost:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   # ── Production profile: SQL Server (activate with --profile prod) ──
   # Run: docker compose --profile prod up

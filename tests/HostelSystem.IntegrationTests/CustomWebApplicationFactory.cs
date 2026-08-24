@@ -25,8 +25,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         builder.ConfigureServices(services =>
         {
             // ── Replace application DbContext with test SQLite ─────────────
-            services.RemoveAll<DbContextOptions<HostelSystemDbContext>>();
-            services.AddDbContext<HostelSystemDbContext>(options =>
+            services.RemoveAll<DbContextOptions<AppDbContext>>();
+            services.AddDbContext<AppDbContext>(options =>
                 options.UseSqlite($"Data Source={_appDbPath}"));
 
             // ── Replace identity DbContext with test SQLite ────────────────
@@ -38,7 +38,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             var sp = services.BuildServiceProvider();
             using var scope = sp.CreateScope();
 
-            var appDb = scope.ServiceProvider.GetRequiredService<HostelSystemDbContext>();
+            var appDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             appDb.Database.Migrate();
 
             var identityDb = scope.ServiceProvider.GetRequiredService<AppIdentityDbContext>();
