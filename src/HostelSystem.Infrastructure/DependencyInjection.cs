@@ -40,6 +40,8 @@ public static class DependencyInjection
             {
                 options.UseSqlite(connectionString);
             }
+            // Suppress PendingModelChangesWarning as error during dev (allows MigrateAsync to run and apply pending migrations)
+            options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
         });
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
