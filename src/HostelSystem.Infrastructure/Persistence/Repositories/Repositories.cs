@@ -46,6 +46,19 @@ public class HostelRepository : IHostelRepository
             .ToListAsync(ct);
     }
 
+    public async Task<(List<Hostel> Items, int TotalCount)> GetPagedAsync(bool onlyActive, int page, int pageSize, CancellationToken ct = default)
+    {
+        var query = _context.Hostels.AsNoTracking().AsQueryable();
+        if (onlyActive) query = query.Where(h => h.IsActive);
+        var total = await query.CountAsync(ct);
+        var items = await query
+            .Include(h => h.Rooms)
+            .OrderBy(h => h.Name)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .ToListAsync(ct);
+        return (items, total);
+    }
+
     public async Task AddAsync(Hostel hostel, CancellationToken ct = default)
     {
         await _context.Hostels.AddAsync(hostel, ct);
@@ -94,6 +107,28 @@ public class RoomRepository : IRoomRepository
             .Where(r => r.HostelId == hostelId && r.IsAvailable && r.CurrentOccupancy < r.Capacity)
             .Include(r => r.Hostel)
             .ToListAsync(ct);
+    }
+
+    public async Task<(List<Room> Items, int TotalCount)> GetPagedAsync(int? hostelId, bool? isAvailable, string? search, int page, int pageSize, CancellationToken ct = default)
+    {
+        var query = _context.Rooms.AsNoTracking().Include(r => r.Hostel).AsQueryable();
+        if (hostelId.HasValue) query = query.Where(r => r.HostelId == hostelId.Value);
+        if (isAvailable.HasValue) query = query.Where(r => r.IsAvailable == isAvailable.Value);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim();
+            query = query.Where(r => r.RoomNumber.Contains(s));
+        }
+        var total = await query.CountAsync(ct);
+        var items = await query.OrderBy(r => r.RoomNumber).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+        return (items, total);
+    }
+
+    public async Task<bool> ExistsByRoomNumberAsync(int hostelId, string roomNumber, int? excludeId = null, CancellationToken ct = default)
+    {
+        var q = _context.Rooms.AsNoTracking().Where(r => r.HostelId == hostelId && r.RoomNumber == roomNumber);
+        if (excludeId.HasValue) q = q.Where(r => r.Id != excludeId.Value);
+        return await q.AnyAsync(ct);
     }
 
     public async Task AddAsync(Room room, CancellationToken ct = default)
