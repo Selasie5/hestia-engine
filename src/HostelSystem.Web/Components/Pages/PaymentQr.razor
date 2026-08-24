@@ -1,0 +1,51 @@
+@page "/payments/{Reference}"
+@rendermode InteractiveServer
+
+<PageTitle>Payment QR — HostelSystem</PageTitle>
+
+<h3>Payment @Reference</h3>
+
+<div class="card mb-3" style="max-width:520px">
+    <div class="card-body">
+        <h5 class="card-title">Reference: <code>@Reference</code></h5>
+        <p class="text-muted">QR encodes <code>{"reference": Reference, "amount": Amount, "currency": "GHS"}</code> — scannable by any QR reader.</p>
+
+        <div class="mt-3">
+            <p class="mb-1"><small>Scan / Download:</small></p>
+            <img src="@qrPng" alt="QR for @Reference" style="max-width:300px; border:1px solid #ddd; padding:8px; background:white;" />
+            <div class="mt-2">
+                <a href="@qrPng" download="@($"{Reference}.png")" class="btn btn-outline-secondary btn-sm">Download PNG</a>
+                <a href="@qrSvg" target="_blank" class="btn btn-outline-secondary btn-sm ms-1">View SVG</a>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button class="btn btn-outline-primary btn-sm" @onclick="Verify">Verify via Paystack (fallback)</button>
+            <span class="ms-2">@verifyMessage</span>
+        </div>
+        <p class="mt-3"><a href="/payments">← Back to payments</a> • API: <code>GET /api/v1.0/Payments/@Reference/verify</code> • <code>GET /api/v1.0/Payments/@Reference/qr?format=png</code></p>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Reference { get; set; } = string.Empty;
+    [Inject] public IConfiguration Config { get; set; } = default!;
+    [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
+
+    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
+    private string qrPng => $"{apiBase}/api/v1.0/Payments/{Reference}/qr?format=png";
+    private string qrSvg => $"{apiBase}/api/v1.0/Payments/{Reference}/qr?format=svg";
+    private string? verifyMessage;
+
+    private async Task Verify()
+    {
+        try
+        {
+            var client = HttpFactory.CreateClient("Api");
+            var res = await client.GetAsync($"{apiBase}/api/v1.0/Payments/{Reference}/verify");
+            var body = await res.Content.ReadAsStringAsync();
+            verifyMessage = res.IsSuccessStatusCode ? $"Verified: {body}" : $"Failed: {body}";
+        }
+        catch (Exception ex) { verifyMessage = ex.Message; }
+    }
+}

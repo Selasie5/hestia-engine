@@ -20,6 +20,7 @@ public class ApproveApplicationHandler : IRequestHandler<ApproveApplicationComma
     private readonly IRoomRepository _roomRepository;
     private readonly IStudentRepository _studentRepository;
     private readonly IAllocationRepository _allocationRepository;
+    private readonly IPaymentRepository _paymentRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICacheService _cacheService;
 
@@ -28,6 +29,7 @@ public class ApproveApplicationHandler : IRequestHandler<ApproveApplicationComma
         IRoomRepository roomRepository,
         IStudentRepository studentRepository,
         IAllocationRepository allocationRepository,
+        IPaymentRepository paymentRepository,
         IUnitOfWork unitOfWork,
         ICacheService cacheService)
     {
@@ -35,6 +37,7 @@ public class ApproveApplicationHandler : IRequestHandler<ApproveApplicationComma
         _roomRepository = roomRepository;
         _studentRepository = studentRepository;
         _allocationRepository = allocationRepository;
+        _paymentRepository = paymentRepository;
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
     }
@@ -65,7 +68,19 @@ public class ApproveApplicationHandler : IRequestHandler<ApproveApplicationComma
 
         await _allocationRepository.AddAsync(allocation, ct);
 
-        // SaveChanges — if the concurrency token conflicts, DbUpdateConcurrencyException is thrown
+        // Save allocation first to get its Id (needed for Payment FK)
+        await _unitOfWork.SaveChangesAsync(ct);
+
+        // Create payment (amount = room price, due in 14 days) per task spec
+        var payment = new Domain.Entities.Payment(
+            student.Id,
+            allocation.Id,
+            room.PricePerSemester,
+            DateTime.UtcNow.AddDays(14));
+
+        await _paymentRepository.AddAsync(payment, ct);
+
+        // Save payment — concurrency token on Room may still conflict, handled by EF
         await _unitOfWork.SaveChangesAsync(ct);
 
         // Dispatch domain events AFTER successful save
