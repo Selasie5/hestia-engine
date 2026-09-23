@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: hestia-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    disk:
+      name: hestia-sqlite
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_FORWARDEDHEADERS_ENABLED
+        value: "true"
+      - key: DatabaseProvider
+        value: Sqlite
+      - key: ConnectionStrings__DefaultConnection
+        value: Data Source=/data/hostelsystem.db
+      - key: Jwt__Secret
+        generateValue: true
+      - key: Jwt__Issuer
+        value: HostelSystem.Api
+      - key: Jwt__Audience
+        value: HostelSystem.Web
+      - key: Paystack__SecretKey
+        sync: false
+      - key: Paystack__PublicKey
+        sync: false
+
+  - type: web
+    name: hestia-web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.web
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_FORWARDEDHEADERS_ENABLED
+        value: "true"
+      - key: ApiHostPort
+        fromService:
+          type: web
+          name: hestia-api
+          property: hostport

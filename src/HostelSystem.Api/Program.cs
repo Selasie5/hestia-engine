@@ -8,6 +8,7 @@ using HostelSystem.Infrastructure.Persistence;
 using HostelSystem.Identity.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
@@ -110,6 +111,13 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHealthChecks("/health");
+
+// Production skips sample-data seeding, but both schemas must still be current.
+using (var migrationScope = app.Services.CreateScope())
+{
+    await migrationScope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+    await migrationScope.ServiceProvider.GetRequiredService<AppIdentityDbContext>().Database.MigrateAsync();
+}
 
 // ─── Seed / Reset (dev + CLI) ───
 bool shouldReset = args.Contains("--seed-reset", StringComparer.OrdinalIgnoreCase);

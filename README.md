@@ -94,6 +94,7 @@ CI: `.github/workflows/ci.yml` — restore → build Release → test (trx+cover
 - `docs/schema.md` — Mermaid ERD + indexes
 - `docs/query-review.md` — Include→Select audit
 - `docs/email-setup.md` — SMTP/Mailtrap + console fallback
+- `docs/render-deployment.md` — Render Blueprint deployment, persistence, Paystack, and verification
 
 ## License
 

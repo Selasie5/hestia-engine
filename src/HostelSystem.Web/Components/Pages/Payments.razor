@@ -14,11 +14,11 @@
         <button class="btn btn-sm btn-outline-secondary mb-2" @onclick="LoadHistory">Refresh</button>
         @if (historyLoading)
         {
-            <p>Loading...</p>
+            <div class="loading-inline" aria-live="polite"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Loading payments…</span></div>
         }
         else if (!string.IsNullOrWhiteSpace(historyError))
         {
-            <div class="alert alert-warning">@historyError</div>
+            <div class="alert alert-warning" role="alert">@historyError <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="LoadHistory">Retry</button></div>
         }
         else if (history.Count == 0)
         {
@@ -26,7 +26,7 @@
         }
         else
         {
-            <table class="table table-sm">
+            <div class="table-responsive"><table class="table table-sm">
                 <thead><tr><th>#</th><th>Amount</th><th>Status</th><th>Reference</th><th>Due</th><th>Action</th></tr></thead>
                 <tbody>
                     @foreach (var p in history)
@@ -54,7 +54,7 @@
                         </tr>
                     }
                 </tbody>
-            </table>
+            </table></div>
         }
         @if (!string.IsNullOrWhiteSpace(verifyMsg))
         {
@@ -67,12 +67,12 @@
     <div class="card-body">
         <h5 class="card-title">Initiate Payment</h5>
         <div class="mb-3">
-            <label class="form-label">Payment ID</label>
-            <input class="form-control" @bind="paymentId" type="number" placeholder="e.g. 1" />
+            <label class="form-label" for="payment-id">Payment ID</label>
+            <input id="payment-id" class="form-control" @bind="paymentId" type="number" min="1" inputmode="numeric" placeholder="e.g. 1" />
         </div>
         <div class="mb-3">
-            <label class="form-label">Email (for Paystack receipt)</label>
-            <input class="form-control" @bind="email" placeholder="student@example.com" />
+            <label class="form-label" for="payment-email">Email (for Paystack receipt)</label>
+            <input id="payment-email" class="form-control" @bind="email" type="email" autocomplete="email" placeholder="student@example.com" />
         </div>
         <button class="btn btn-primary" @onclick="Initiate" disabled="@isSubmitting">
             @(isSubmitting ? "Initiating..." : "Initiate with Paystack")
@@ -91,11 +91,23 @@
                 }
                 <div class="mt-3">
                     <p class="mb-1"><small>QR (encodes reference + amount + currency):</small></p>
-                    <img src="@($"{apiBase}/api/v1.0/Payments/{lastResult.TransactionReference}/qr?format=png")"
-                         alt="QR @lastResult.TransactionReference" style="max-width:260px; border:1px solid #ddd; padding:6px; background:white;" />
+                    @if (qrLoading)
+                    {
+                        <div class="loading-inline"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Preparing secure QR…</span></div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(qrError))
+                    {
+                        <div class="alert alert-warning" role="alert">@qrError</div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(qrPngData))
+                    {
+                        <img class="payment-qr" src="@qrPngData" width="260" height="260" alt="Payment QR for @lastResult.TransactionReference" />
+                    }
                     <div class="mt-2">
-                        <a href="@($"{apiBase}/api/v1.0/Payments/{lastResult.TransactionReference}/qr?format=png")" target="_blank" class="btn btn-outline-secondary btn-sm">PNG</a>
-                        <a href="@($"{apiBase}/api/v1.0/Payments/{lastResult.TransactionReference}/qr?format=svg")" target="_blank" class="btn btn-outline-secondary btn-sm ms-1">SVG</a>
+                        @if (!string.IsNullOrWhiteSpace(qrPngData))
+                        {
+                            <a href="@qrPngData" download="@($"{lastResult.TransactionReference}.png")" class="btn btn-outline-secondary btn-sm">Download PNG</a>
+                        }
                         <a href="@($"/payments/{lastResult.TransactionReference}")" class="btn btn-outline-primary btn-sm ms-1">Details →</a>
                     </div>
                 </div>
@@ -117,9 +129,6 @@
 
 @code {
     [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
-    [Inject] public IConfiguration Config { get; set; } = default!;
-    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
-
     private int paymentId;
     private string email = "";
     private string viewRef = "";
@@ -127,6 +136,9 @@
     private bool isError;
     private bool isSubmitting;
     private InitiateResult? lastResult;
+    private string? qrPngData;
+    private string? qrError;
+    private bool qrLoading;
 
     private List<PaymentRow> history = new();
     private bool historyLoading = true;
@@ -140,7 +152,7 @@
         try
         {
             var client = HttpFactory.CreateClient("Api");
-            var res = await client.GetAsync($"{apiBase}/api/v1.0/Payments/me");
+            var res = await client.GetAsync("/api/v1.0/Payments/me");
             var body = await res.Content.ReadAsStringAsync();
             if (!res.IsSuccessStatusCode) { historyError = body; return; }
             history = System.Text.Json.JsonSerializer.Deserialize<List<PaymentRow>>(body, new System.Text.Json.JsonSerializerOptions{ PropertyNameCaseInsensitive = true }) ?? new();
@@ -154,7 +166,7 @@
         try
         {
             var client = HttpFactory.CreateClient("Api");
-            var res = await client.GetAsync($"{apiBase}/api/v1.0/Payments/{reference}/verify");
+            var res = await client.GetAsync($"/api/v1.0/Payments/{Uri.EscapeDataString(reference)}/verify");
             var body = await res.Content.ReadAsStringAsync();
             verifyMsg = res.IsSuccessStatusCode ? $"Verified: {body}" : body;
             verifyError = !res.IsSuccessStatusCode;
@@ -175,7 +187,7 @@
         try
         {
             var client = HttpFactory.CreateClient("Api");
-            var res = await client.PostAsJsonAsync($"{apiBase}/api/v1.0/Payments/initiate", new { paymentId, email });
+            var res = await client.PostAsJsonAsync("/api/v1.0/Payments/initiate", new { paymentId, email });
             var body = await res.Content.ReadAsStringAsync();
             if (!res.IsSuccessStatusCode)
             {
@@ -183,9 +195,29 @@
             }
             lastResult = System.Text.Json.JsonSerializer.Deserialize<InitiateResult>(body, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             message = "Initialized — open Paystack checkout or scan QR.";
+            if (lastResult is not null)
+                await LoadQr(lastResult.TransactionReference);
         }
         catch (Exception ex) { isError = true; message = ex.Message; }
         finally { isSubmitting = false; }
+    }
+
+    private async Task LoadQr(string reference)
+    {
+        qrLoading = true; qrError = null; qrPngData = null;
+        try
+        {
+            var client = HttpFactory.CreateClient("Api");
+            var response = await client.GetAsync($"/api/v1.0/Payments/{Uri.EscapeDataString(reference)}/qr?format=png");
+            if (!response.IsSuccessStatusCode)
+            {
+                qrError = "The QR could not be loaded. Open payment details to retry.";
+                return;
+            }
+            qrPngData = $"data:image/png;base64,{Convert.ToBase64String(await response.Content.ReadAsByteArrayAsync())}";
+        }
+        catch (Exception ex) { qrError = ex.Message; }
+        finally { qrLoading = false; }
     }
 
     private record InitiateResult(string TransactionReference, decimal Amount, string? AuthorizationUrl, string? AccessCode, string Status);

@@ -25,7 +25,7 @@ builder.Services.AddTransient<AuthHeaderHandler>();
 
 builder.Services.AddHttpClient("Api", client =>
 {
-    var apiBase = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:8080";
+    var apiBase = ResolveApiBaseAddress(builder.Configuration);
     client.BaseAddress = new Uri(apiBase);
     client.Timeout = TimeSpan.FromSeconds(30);
 }).AddHttpMessageHandler<AuthHeaderHandler>();
@@ -33,7 +33,7 @@ builder.Services.AddHttpClient("Api", client =>
 // Plain HttpClient for auth (login/register/refresh) without handler to avoid loop
 builder.Services.AddHttpClient("AuthBypass", client =>
 {
-    var apiBase = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:8080";
+    var apiBase = ResolveApiBaseAddress(builder.Configuration);
     client.BaseAddress = new Uri(apiBase);
     client.Timeout = TimeSpan.FromSeconds(30);
 });
@@ -62,3 +62,16 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+static string ResolveApiBaseAddress(IConfiguration configuration)
+{
+    var privateHostPort = configuration["ApiHostPort"];
+    if (!string.IsNullOrWhiteSpace(privateHostPort))
+        return $"http://{privateHostPort}";
+
+    var configuredUrl = configuration["ApiBaseUrl"];
+    if (!string.IsNullOrWhiteSpace(configuredUrl))
+        return configuredUrl;
+
+    return "http://localhost:8080";
+}

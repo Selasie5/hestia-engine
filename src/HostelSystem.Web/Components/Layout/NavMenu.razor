@@ -6,29 +6,28 @@
             <small>Accommodation</small>
         </span>
     </a>
-    <input type="checkbox" id="nav-toggle" title="Toggle navigation" class="navbar-toggler" />
-    <label for="nav-toggle" class="nav-toggle-label" aria-label="Toggle navigation"><span></span><span></span><span></span></label>
+    <button type="button" class="nav-toggle-label" aria-label="Toggle navigation" aria-expanded="@navOpen" @onclick="ToggleNavigation"><span></span><span></span><span></span></button>
 </div>
 
-<div class="nav-scrollable">
+<div class="nav-scrollable @(navOpen ? "open" : null)">
     <nav class="nav flex-column" aria-label="Portal navigation">
         <AuthorizeView Roles="Student">
             <Authorized>
                 <div class="nav-section-label">Student portal</div>
                 <div class="nav-item">
-                    <NavLink class="nav-link" href="" Match="NavLinkMatch.All"><span class="nav-icon">⌂</span>Overview</NavLink>
+                    <NavLink class="nav-link" href="" Match="NavLinkMatch.All" @onclick="CloseNavigation"><UiIcon Name="home" />Overview</NavLink>
                 </div>
                 <div class="nav-item">
-                    <NavLink class="nav-link" href="hostels"><span class="nav-icon">▦</span>Find a hostel</NavLink>
+                    <NavLink class="nav-link" href="hostels" @onclick="CloseNavigation"><UiIcon Name="building" />Find a hostel</NavLink>
                 </div>
                 <div class="nav-item">
-                    <NavLink class="nav-link" href="applications"><span class="nav-icon">□</span>My applications</NavLink>
+                    <NavLink class="nav-link" href="applications" @onclick="CloseNavigation"><UiIcon Name="document" />My applications</NavLink>
                 </div>
                 <div class="nav-item">
-                    <NavLink class="nav-link" href="allocations"><span class="nav-icon">◇</span>My allocation</NavLink>
+                    <NavLink class="nav-link" href="allocations" @onclick="CloseNavigation"><UiIcon Name="key" />My allocation</NavLink>
                 </div>
                 <div class="nav-item">
-                    <NavLink class="nav-link" href="payments"><span class="nav-icon">₵</span>Payments</NavLink>
+                    <NavLink class="nav-link" href="payments" @onclick="CloseNavigation"><UiIcon Name="wallet" />Payments</NavLink>
                 </div>
             </Authorized>
         </AuthorizeView>
@@ -37,26 +36,32 @@
             <Authorized>
                 <div class="nav-section-label">Administration</div>
                 <div class="nav-item">
-                    <NavLink class="nav-link" href="admin" Match="NavLinkMatch.All"><span class="nav-icon">⌂</span>Dashboard</NavLink>
+                    <NavLink class="nav-link" href="admin" Match="NavLinkMatch.All" @onclick="CloseNavigation"><UiIcon Name="home" />Dashboard</NavLink>
                 </div>
                 <div class="nav-item">
-                    <NavLink class="nav-link" href="admin/applications"><span class="nav-icon">✓</span>Applications</NavLink>
+                    <NavLink class="nav-link" href="admin/applications" @onclick="CloseNavigation"><UiIcon Name="check" />Applications</NavLink>
                 </div>
                 <div class="nav-item">
-                    <NavLink class="nav-link" href="admin/hostels"><span class="nav-icon">▦</span>Hostels & rooms</NavLink>
+                    <NavLink class="nav-link" href="admin/hostels" @onclick="CloseNavigation"><UiIcon Name="building" />Hostels & rooms</NavLink>
                 </div>
                 <div class="nav-item">
-                    <NavLink class="nav-link" href="admin/allocations"><span class="nav-icon">◇</span>Allocations</NavLink>
+                    <NavLink class="nav-link" href="admin/allocations" @onclick="CloseNavigation"><UiIcon Name="key" />Allocations</NavLink>
                 </div>
                 <div class="nav-item">
-                    <NavLink class="nav-link" href="admin/payments"><span class="nav-icon">₵</span>Payments</NavLink>
+                    <NavLink class="nav-link" href="admin/payments" @onclick="CloseNavigation"><UiIcon Name="wallet" />Payments</NavLink>
                 </div>
             </Authorized>
         </AuthorizeView>
     </nav>
 
     <div class="nav-footer">
-        <NavLink class="nav-link logout-link" href="logout"><span class="nav-icon">↗</span>Sign out</NavLink>
+        <NavLink class="nav-link logout-link" href="logout" @onclick="CloseNavigation"><UiIcon Name="logout" />Sign out</NavLink>
         <small>Hestia Management System</small>
     </div>
 </div>
+
+@code {
+    private bool navOpen;
+    private void ToggleNavigation() => navOpen = !navOpen;
+    private void CloseNavigation() => navOpen = false;
+}

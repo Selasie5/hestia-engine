@@ -22,6 +22,7 @@ public class PaymentsController : ControllerBase
     private readonly IQrCodeService _qrCodeService;
     private readonly PaystackSettings _paystackSettings;
     private readonly ILogger<PaymentsController> _logger;
+    private readonly IHostEnvironment _environment;
 
     public PaymentsController(
         IMediator mediator,
@@ -29,7 +30,8 @@ public class PaymentsController : ControllerBase
         IStudentRepository studentRepository,
         IQrCodeService qrCodeService,
         IOptions<PaystackSettings> paystackOptions,
-        ILogger<PaymentsController> logger)
+        ILogger<PaymentsController> logger,
+        IHostEnvironment environment)
     {
         _mediator = mediator;
         _paymentRepository = paymentRepository;
@@ -37,6 +39,7 @@ public class PaymentsController : ControllerBase
         _qrCodeService = qrCodeService;
         _paystackSettings = paystackOptions.Value;
         _logger = logger;
+        _environment = environment;
     }
 
     public record InitiateRequest(int PaymentId, string Email, string? CallbackUrl = null);
@@ -135,9 +138,15 @@ public class PaymentsController : ControllerBase
             _logger.LogWarning("Paystack webhook missing signature header");
             return Unauthorized(new { error = "Missing signature" });
         }
-        // If SecretKey not configured, allow in dev for testing (log warning)
+        if (string.IsNullOrWhiteSpace(_paystackSettings.SecretKey) && !_environment.IsDevelopment())
+        {
+            _logger.LogError("Paystack webhook rejected because SecretKey is not configured");
+            return Problem("Payment webhook is not configured.", statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        // Permit unsigned payloads only for explicit local development testing.
         if (string.IsNullOrWhiteSpace(_paystackSettings.SecretKey))
-            _logger.LogWarning("Paystack SecretKey not configured — skipping signature check (dev only)");
+            _logger.LogWarning("Paystack SecretKey not configured — skipping signature check in Development");
 
         // Parse Paystack event
         try
@@ -190,6 +199,10 @@ public class PaymentsController : ControllerBase
         if (string.IsNullOrWhiteSpace(reference))
             return BadRequest(new { error = "Reference is required." });
 
+        var payment = await _paymentRepository.GetByTransactionReferenceAsync(reference, ct);
+        var ownershipResult = await AuthorizePaymentAccess(payment, ct);
+        if (ownershipResult is not null) return ownershipResult;
+
         var result = await _mediator.Send(new VerifyPaymentCommand(reference), ct);
         if (!result.IsSuccess)
             return BadRequest(new { error = result.Error });
@@ -208,6 +221,9 @@ public class PaymentsController : ControllerBase
         var payment = await _paymentRepository.GetByTransactionReferenceAsync(reference, ct);
         if (payment is null)
             return NotFound(new { error = "Payment not found." });
+
+        var ownershipResult = await AuthorizePaymentAccess(payment, ct);
+        if (ownershipResult is not null) return ownershipResult;
 
         // Encode reference + amount as JSON for scannability; QR readers can parse
         var payload = System.Text.Json.JsonSerializer.Serialize(new
@@ -260,5 +276,21 @@ public class PaymentsController : ControllerBase
         using var hmac = new HMACSHA512(Encoding.UTF8.GetBytes(secret));
         var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
         return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+    }
+
+    private async Task<IActionResult?> AuthorizePaymentAccess(HostelSystem.Domain.Entities.Payment? payment, CancellationToken ct)
+    {
+        if (payment is null)
+            return NotFound(new { error = "Payment not found." });
+
+        if (User.IsInRole("Admin"))
+            return null;
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized(new { error = "Invalid token." });
+
+        var student = await _studentRepository.GetByUserIdAsync(userId, ct);
+        return student is not null && student.Id == payment.StudentId ? null : Forbid();
     }
 }

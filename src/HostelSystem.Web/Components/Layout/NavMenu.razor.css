@@ -93,7 +93,8 @@
     box-shadow: 0 8px 20px rgba(8, 20, 49, .22);
 }
 
-.nav-icon {
+.nav-item ::deep .nav-icon,
+.nav-footer ::deep .nav-icon {
     width: 1.45rem;
     margin-right: .65rem;
     color: inherit;
@@ -115,7 +116,6 @@
     font-size: .65rem;
 }
 
-.navbar-toggler,
 .nav-toggle-label {
     display: none;
 }
@@ -141,6 +141,7 @@
         border: 1px solid rgba(255,255,255,.14);
         border-radius: .6rem;
         cursor: pointer;
+        background: transparent;
     }
 
     .nav-toggle-label span {
@@ -157,7 +158,7 @@
         padding-bottom: 1rem;
     }
 
-    .navbar-toggler:checked ~ .nav-toggle-label { background: rgba(255,255,255,.08); }
-    .nav-header:has(.navbar-toggler:checked) + .nav-scrollable { display: flex; }
+    .nav-toggle-label[aria-expanded="true"] { background: rgba(255,255,255,.08); }
+    .nav-scrollable.open { display: flex; }
     .nav-footer small { display: none; }
 }

@@ -111,9 +111,15 @@ public class ApproveApplicationHandlerTests
     {
         var student = MakeStudent();
         var room = new Room("101A", 4, 500m, hostelId: 1);
+        SetPersistedId(student, 1);
+        SetPersistedId(room, 1);
         var app = new RoomApplication(studentId: student.Id, roomId: room.Id);
+        SetPersistedId(app, 1);
         return (app, student, room);
     }
+
+    private static void SetPersistedId(Entity entity, int id) =>
+        typeof(Entity).GetProperty(nameof(Entity.Id))!.SetValue(entity, id);
 
     private void SetupRepos(RoomApplication app, Student student, Room room)
     {
