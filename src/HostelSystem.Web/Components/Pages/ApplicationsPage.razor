@@ -52,8 +52,6 @@ else
 
 @code {
     [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
-    [Inject] public IConfiguration Config { get; set; } = default!;
-    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
     private List<AppDto> apps = new(); private bool isLoading = true; private string? error; private string? msg; private bool msgError; private int? busy;
 
     protected override async Task OnInitializedAsync() => await Load();
@@ -63,12 +61,12 @@ else
         try
         {
             var client = HttpFactory.CreateClient("Api");
-            var res = await client.GetAsync($"{apiBase}/api/v1.0/Applications/me");
+            var res = await client.GetAsync("/api/v1.0/Applications/me");
             var body = await res.Content.ReadAsStringAsync();
-            if (!res.IsSuccessStatusCode) { error = body; return; }
+            if (!res.IsSuccessStatusCode) { error = ExtractError(body, "We couldn’t load your applications. Please try again."); return; }
             apps = System.Text.Json.JsonSerializer.Deserialize<List<AppDto>>(body, new System.Text.Json.JsonSerializerOptions{ PropertyNameCaseInsensitive = true}) ?? new();
         }
-        catch (Exception ex) { error = ex.Message; }
+        catch (Exception) { error = "The application service is temporarily unavailable. Please try again in a moment."; }
         finally { isLoading = false; }
     }
     private async Task Cancel(int id)
@@ -77,13 +75,19 @@ else
         try
         {
             var client = HttpFactory.CreateClient("Api");
-            var res = await client.PostAsJsonAsync($"{apiBase}/api/v1.0/Applications/{id}/cancel", new { reason = "Cancelled by student" });
+            var res = await client.PostAsJsonAsync($"/api/v1.0/Applications/{id}/cancel", new { reason = "Cancelled by student" });
             var body = await res.Content.ReadAsStringAsync();
-            if (!res.IsSuccessStatusCode) { msg = body; msgError = true; }
+            if (!res.IsSuccessStatusCode) { msg = ExtractError(body, "We couldn’t cancel this application."); msgError = true; }
             else { msg = "Cancelled."; msgError = false; await Load(); }
         }
-        catch (Exception ex) { msg = ex.Message; msgError = true; }
+        catch (Exception) { msg = "The application service is temporarily unavailable."; msgError = true; }
         finally { busy = null; }
+    }
+    private static string ExtractError(string body, string fallback)
+    {
+        try { using var doc = System.Text.Json.JsonDocument.Parse(body); if (doc.RootElement.TryGetProperty("error", out var value)) return value.GetString() ?? fallback; }
+        catch { }
+        return fallback;
     }
     private record AppDto(int Id, int StudentId, int RoomId, string Status, DateTime ApplicationDate, DateTime? ReviewedOn, string? ReviewedBy, string? RejectionReason, string? RoomNumber, string? HostelName);
 }

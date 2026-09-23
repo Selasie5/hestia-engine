@@ -48,17 +48,25 @@ else
                     <div class="room-card-body">
                         <div class="room-title"><div><span>Room</span><h3>@r.RoomNumber</h3></div><span class="room-capacity">@r.CurrentOccupancy of @r.Capacity occupied</span></div>
                         <div class="room-price"><strong>GHS @r.PricePerSemester.ToString("N2")</strong><span>per semester</span></div>
-                        <button class="btn btn-primary room-apply" @onclick="() => Apply(r.Id)" disabled="@(!r.IsAvailable || applyBusy == r.Id)">
-                            @(applyBusy == r.Id ? "Submitting application…" : r.IsAvailable ? "Apply for this room" : "Room currently full")
-                        </button>
+                        <AuthorizeView>
+                            <Authorized>
+                                <button class="btn btn-primary room-apply" @onclick="() => Apply(r.Id)" disabled="@(!r.IsAvailable || applyBusy is not null)">
+                                    @if (applyBusy == r.Id) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
+                                    @(applyBusy == r.Id ? "Submitting application…" : r.IsAvailable ? "Apply for this room" : "Room currently full")
+                                </button>
+                            </Authorized>
+                            <NotAuthorized>
+                                <a class="btn btn-primary room-apply" href="@($"/login?returnUrl={Uri.EscapeDataString($"/hostels/{Id}")}")">Sign in to apply</a>
+                            </NotAuthorized>
+                        </AuthorizeView>
+                        @if (feedbackRoomId == r.Id && !string.IsNullOrWhiteSpace(applyMsg))
+                        {
+                            <div class="room-feedback @(applyError ? "error" : "success")" role="status" aria-live="polite">@applyMsg</div>
+                        }
                     </div>
                 </article>
             }
         </div>
-    }
-    @if (!string.IsNullOrWhiteSpace(applyMsg))
-    {
-        <div class="alert @(applyError ? "alert-danger" : "alert-success") mt-3">@applyMsg</div>
     }
     <p class="detail-footer"><a href="/hostels">&larr; Back to hostels</a><a href="/applications">My applications →</a></p>
 }
@@ -67,12 +75,14 @@ else
 @code {
     [Parameter] public int Id { get; set; }
     [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
+    [Inject] public NavigationManager Nav { get; set; } = default!;
     private HostelDto? hostel;
     private List<RoomDto> rooms = new();
     private bool isLoading = true; private bool roomsLoading = true;
     private string? error;
     private string? applyMsg; private bool applyError;
     private int? applyBusy;
+    private int? feedbackRoomId;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -102,7 +112,7 @@ else
 
     private async Task Apply(int roomId)
     {
-        applyBusy = roomId; applyMsg = "Submitting..."; applyError = false;
+        applyBusy = roomId; feedbackRoomId = roomId; applyMsg = "Submitting your application…"; applyError = false;
         try
         {
             var client = HttpFactory.CreateClient("Api");
@@ -111,7 +121,7 @@ else
             var meBody = await meRes.Content.ReadAsStringAsync();
             if (!meRes.IsSuccessStatusCode)
             {
-                if ((int)meRes.StatusCode == 401) applyMsg = "Please sign in first (session expired). Go to Login.";
+                if ((int)meRes.StatusCode == 401) applyMsg = "Your session has expired. Please sign in and try again.";
                 else if ((int)meRes.StatusCode == 404) applyMsg = "Student profile not found — register again or contact admin.";
                 else applyMsg = $"Cannot load profile ({(int)meRes.StatusCode}): {ExtractError(meBody)}";
                 applyError = true; return;
@@ -136,14 +146,14 @@ else
                     applyMsg += " — you already have a room.";
                 return;
             }
-            applyMsg = "Applied! Check My Applications for status.";
+            applyMsg = "Application submitted. Opening your applications…";
             applyError = false;
-            // refresh available rooms (occupancy may not change until approved, but still)
-            await OnParametersSetAsync();
+            await Task.Delay(650);
+            Nav.NavigateTo("/applications");
         }
         catch (Exception ex)
         {
-            applyMsg = $"Error: {ex.Message}";
+            applyMsg = "The application service is temporarily unavailable. Please try again.";
             applyError = true;
             Console.WriteLine($"Apply error for room {roomId}: {ex}");
         }

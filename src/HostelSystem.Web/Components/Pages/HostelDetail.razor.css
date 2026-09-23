@@ -20,7 +20,10 @@
 .room-card-body { display: flex; min-height: 210px; flex-direction: column; padding: 1.15rem; }
 .room-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }.room-title > div > span { color: var(--hestia-muted); font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }.room-title h3 { margin: .15rem 0 0; font-size: 1.05rem; font-weight: 800; }.room-capacity { color: var(--hestia-muted); font-size: .7rem; font-weight: 600; }
 .room-price { display: flex; align-items: baseline; gap: .4rem; margin: 1rem 0; }.room-price strong { font-family: 'Manrope',sans-serif; font-size: 1rem; font-variant-numeric: tabular-nums; }.room-price span { color: var(--hestia-muted); font-size: .72rem; }
-.room-apply { width: 100%; margin-top: auto; }
+.room-apply { display: inline-flex; width: 100%; align-items: center; justify-content: center; gap: .5rem; margin-top: auto; }
+.room-feedback { margin-top: .65rem; padding: .65rem .75rem; border-radius: .6rem; font-size: .73rem; font-weight: 600; line-height: 1.45; }
+.room-feedback.error { color: var(--hestia-danger); background: #fff1ef; }
+.room-feedback.success { color: var(--hestia-success); background: #eaf8f3; }
 .detail-footer { display: flex; justify-content: space-between; margin: 1.5rem 0 0; }.detail-footer a { display: inline-flex; min-height: 44px; align-items: center; font-size: .8rem; font-weight: 700; text-decoration: none; }
 @media (max-width: 1000px) { .room-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 650px) { .hostel-detail-page { padding: 1.5rem 1.1rem 2.5rem; }.detail-title-row { align-items: flex-start; flex-direction: column; gap: 1rem; }.detail-availability { width: 100%; }.room-grid { grid-template-columns: 1fr; }.rooms-heading { align-items: flex-start; }.room-card-body { min-height: 195px; } }

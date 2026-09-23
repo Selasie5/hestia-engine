@@ -2,222 +2,111 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 
-<PageTitle>Payments — HostelSystem</PageTitle>
+<PageTitle>Payment History — Hestia</PageTitle>
 
-<h3>Payments</h3>
-<p class="text-muted">Your payments history • Initiate via Paystack or scan QR.</p>
+<header class="payments-heading">
+    <div><span class="eyebrow">Transactions</span><h1>Payment history</h1><p>Review accommodation payments and check their current status.</p></div>
+    <button class="btn btn-outline-secondary" @onclick="LoadHistory" disabled="@historyLoading">@(historyLoading ? "Refreshing…" : "Refresh")</button>
+</header>
 
-<div class="card mb-4">
-    <div class="card-body">
-        <h5 class="card-title">My Payments</h5>
-        <button class="btn btn-sm btn-outline-secondary mb-2" @onclick="LoadHistory">Refresh</button>
-        @if (historyLoading)
-        {
-            <div class="loading-inline" aria-live="polite"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Loading payments…</span></div>
-        }
-        else if (!string.IsNullOrWhiteSpace(historyError))
-        {
-            <div class="alert alert-warning" role="alert">@historyError <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="LoadHistory">Retry</button></div>
-        }
-        else if (history.Count == 0)
-        {
-            <div class="alert alert-info">No payments yet. Apply and get approved — a payment will appear automatically.</div>
-        }
-        else
-        {
-            <div class="table-responsive"><table class="table table-sm">
-                <thead><tr><th>#</th><th>Amount</th><th>Status</th><th>Reference</th><th>Due</th><th>Action</th></tr></thead>
+@if (historyLoading)
+{
+    <div class="loading-inline" aria-live="polite"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Loading your payments…</span></div>
+}
+else if (!string.IsNullOrWhiteSpace(historyError))
+{
+    <section class="payment-state" role="alert"><h2>We couldn’t load your payments</h2><p>@historyError</p><button class="btn btn-primary" @onclick="LoadHistory">Try again</button></section>
+}
+else if (history.Count == 0)
+{
+    <section class="payment-state"><h2>No payments yet</h2><p>A payment will be created after your room application is approved and an allocation is confirmed.</p><a class="btn btn-primary" href="/applications">View applications</a></section>
+}
+else
+{
+    <section class="payments-card">
+        <div class="payments-summary"><div><span>Total transactions</span><strong>@history.Count</strong></div><div><span>Completed</span><strong>@history.Count(p => p.Status == "Completed")</strong></div><div><span>Outstanding</span><strong>GHS @history.Where(p => p.Status == "Pending").Sum(p => p.Amount).ToString("N2")</strong></div></div>
+        <div class="table-responsive">
+            <table class="table payment-table">
+                <thead><tr><th>Payment</th><th>Amount</th><th>Status</th><th>Due date</th><th>Paid on</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
                 <tbody>
-                    @foreach (var p in history)
+                    @foreach (var payment in history.OrderByDescending(p => p.Id))
                     {
                         <tr>
-                            <td>@p.Id</td>
-                            <td>GHS @p.Amount</td>
-                            <td><span class="badge bg-@(p.Status=="Completed"?"success":p.Status=="Pending"?"warning text-dark":p.Status=="Refunded"?"info":"secondary")">@p.Status</span></td>
-                            <td><code>@(p.TransactionReference ?? "-")</code></td>
-                            <td>@p.DueDate.ToLocalTime().ToString("yyyy-MM-dd") @(p.IsOverdue ? "(overdue)" : "")</td>
-                            <td>
-                                @if (!string.IsNullOrWhiteSpace(p.TransactionReference))
+                            <td><strong>#@payment.Id</strong>@if (!string.IsNullOrWhiteSpace(payment.TransactionReference)) { <small>@payment.TransactionReference</small> }</td>
+                            <td><strong>GHS @payment.Amount.ToString("N2")</strong></td>
+                            <td><span class="payment-status @payment.Status.ToLowerInvariant()">@payment.Status</span></td>
+                            <td><span class="@(payment.IsOverdue && payment.Status == "Pending" ? "overdue" : null)">@payment.DueDate.ToLocalTime().ToString("dd MMM yyyy")</span></td>
+                            <td>@(payment.PaidOn?.ToLocalTime().ToString("dd MMM yyyy") ?? "—")</td>
+                            <td class="payment-actions">
+                                @if (!string.IsNullOrWhiteSpace(payment.TransactionReference))
                                 {
-                                    <a class="btn btn-sm btn-outline-primary" href="/payments/@p.TransactionReference">QR</a>
-                                    @if (p.Status=="Pending")
-                                    {
-                                        <button class="btn btn-sm btn-outline-success ms-1" @onclick="() => Verify(p.TransactionReference!)">Verify</button>
-                                    }
+                                    <a class="btn btn-sm btn-outline-primary" href="@($"/payments/{payment.TransactionReference}")">View details</a>
+                                    @if (payment.Status == "Pending") { <button class="btn btn-sm btn-outline-secondary" @onclick="() => Verify(payment.TransactionReference!)" disabled="@(verifyingReference == payment.TransactionReference)">@(verifyingReference == payment.TransactionReference ? "Checking…" : "Check status")</button> }
                                 }
-                                else if (p.Status=="Pending")
+                                else if (payment.Status == "Pending")
                                 {
-                                    <small class="text-muted">Initiate below</small>
+                                    <a class="btn btn-sm btn-primary" href="/allocations">Pay from allocation</a>
                                 }
                             </td>
                         </tr>
                     }
                 </tbody>
-            </table></div>
-        }
-        @if (!string.IsNullOrWhiteSpace(verifyMsg))
-        {
-            <div class="alert @(verifyError?"alert-danger":"alert-success")">@verifyMsg</div>
-        }
-    </div>
-</div>
+            </table>
+        </div>
+    </section>
+}
 
-<div class="card mb-4" style="max-width:560px">
-    <div class="card-body">
-        <h5 class="card-title">Initiate Payment</h5>
-        <div class="mb-3">
-            <label class="form-label" for="payment-id">Payment ID</label>
-            <input id="payment-id" class="form-control" @bind="paymentId" type="number" min="1" inputmode="numeric" placeholder="e.g. 1" />
-        </div>
-        <div class="mb-3">
-            <label class="form-label" for="payment-email">Email (for Paystack receipt)</label>
-            <input id="payment-email" class="form-control" @bind="email" type="email" autocomplete="email" placeholder="student@example.com" />
-        </div>
-        <button class="btn btn-primary" @onclick="Initiate" disabled="@isSubmitting">
-            @(isSubmitting ? "Initiating..." : "Initiate with Paystack")
-        </button>
-        @if (!string.IsNullOrWhiteSpace(message))
-        {
-            <div class="alert alert-@(isError ? "danger" : "success") mt-3">@message</div>
-        }
-        @if (lastResult is not null)
-        {
-            <div class="mt-3">
-                <p>Reference: <code>@lastResult.TransactionReference</code> • Amount: <strong>GHS @lastResult.Amount</strong></p>
-                @if (!string.IsNullOrWhiteSpace(lastResult.AuthorizationUrl))
-                {
-                    <a class="btn btn-success btn-sm" href="@lastResult.AuthorizationUrl" target="_blank">Open Paystack Checkout</a>
-                }
-                <div class="mt-3">
-                    <p class="mb-1"><small>QR (encodes reference + amount + currency):</small></p>
-                    @if (qrLoading)
-                    {
-                        <div class="loading-inline"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Preparing secure QR…</span></div>
-                    }
-                    else if (!string.IsNullOrWhiteSpace(qrError))
-                    {
-                        <div class="alert alert-warning" role="alert">@qrError</div>
-                    }
-                    else if (!string.IsNullOrWhiteSpace(qrPngData))
-                    {
-                        <img class="payment-qr" src="@qrPngData" width="260" height="260" alt="Payment QR for @lastResult.TransactionReference" />
-                    }
-                    <div class="mt-2">
-                        @if (!string.IsNullOrWhiteSpace(qrPngData))
-                        {
-                            <a href="@qrPngData" download="@($"{lastResult.TransactionReference}.png")" class="btn btn-outline-secondary btn-sm">Download PNG</a>
-                        }
-                        <a href="@($"/payments/{lastResult.TransactionReference}")" class="btn btn-outline-primary btn-sm ms-1">Details →</a>
-                    </div>
-                </div>
-            </div>
-        }
-    </div>
-</div>
-
-<div class="card" style="max-width:560px">
-    <div class="card-body">
-        <h5 class="card-title">View QR by Reference</h5>
-        <div class="input-group">
-            <input class="form-control" @bind="viewRef" placeholder="HS-1-20260825-AB12CD34" />
-            <a class="btn btn-outline-primary" href="@($"/payments/{viewRef}")">View</a>
-        </div>
-        <small class="text-muted">Enter a transaction reference (e.g. HS-...) to see its QR.</small>
-    </div>
-</div>
+@if (!string.IsNullOrWhiteSpace(verifyMessage))
+{
+    <div class="alert @(verifyError ? "alert-danger" : "alert-success") mt-3" role="status">@verifyMessage</div>
+}
 
 @code {
     [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
-    private int paymentId;
-    private string email = "";
-    private string viewRef = "";
-    private string? message;
-    private bool isError;
-    private bool isSubmitting;
-    private InitiateResult? lastResult;
-    private string? qrPngData;
-    private string? qrError;
-    private bool qrLoading;
-
     private List<PaymentRow> history = new();
     private bool historyLoading = true;
     private string? historyError;
-    private string? verifyMsg; private bool verifyError;
+    private string? verifyMessage;
+    private bool verifyError;
+    private string? verifyingReference;
 
     protected override async Task OnInitializedAsync() => await LoadHistory();
+
     private async Task LoadHistory()
     {
         historyLoading = true; historyError = null;
         try
         {
-            var client = HttpFactory.CreateClient("Api");
-            var res = await client.GetAsync("/api/v1.0/Payments/me");
-            var body = await res.Content.ReadAsStringAsync();
-            if (!res.IsSuccessStatusCode) { historyError = body; return; }
-            history = System.Text.Json.JsonSerializer.Deserialize<List<PaymentRow>>(body, new System.Text.Json.JsonSerializerOptions{ PropertyNameCaseInsensitive = true }) ?? new();
+            var response = await HttpFactory.CreateClient("Api").GetAsync("/api/v1.0/Payments/me");
+            var body = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode) { historyError = ExtractError(body, "We couldn’t load your payment history."); return; }
+            history = System.Text.Json.JsonSerializer.Deserialize<List<PaymentRow>>(body, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
         }
-        catch (Exception ex) { historyError = ex.Message; }
+        catch (Exception) { historyError = "The payment service is temporarily unavailable. Please try again in a moment."; }
         finally { historyLoading = false; }
     }
+
     private async Task Verify(string reference)
     {
-        verifyMsg = null; verifyError = false;
+        verifyingReference = reference; verifyMessage = null; verifyError = false;
         try
         {
-            var client = HttpFactory.CreateClient("Api");
-            var res = await client.GetAsync($"/api/v1.0/Payments/{Uri.EscapeDataString(reference)}/verify");
-            var body = await res.Content.ReadAsStringAsync();
-            verifyMsg = res.IsSuccessStatusCode ? $"Verified: {body}" : body;
-            verifyError = !res.IsSuccessStatusCode;
-            if (res.IsSuccessStatusCode) await LoadHistory();
+            var response = await HttpFactory.CreateClient("Api").GetAsync($"/api/v1.0/Payments/{Uri.EscapeDataString(reference)}/verify");
+            var body = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode) { verifyMessage = ExtractError(body, "We couldn’t verify this payment."); verifyError = true; return; }
+            verifyMessage = "Payment status updated.";
+            await LoadHistory();
         }
-        catch (Exception ex) { verifyMsg = ex.Message; verifyError = true; }
+        catch (Exception) { verifyMessage = "The payment service is temporarily unavailable."; verifyError = true; }
+        finally { verifyingReference = null; }
     }
-    private record PaymentRow(int Id, decimal Amount, string Status, string? TransactionReference, DateTime? PaidOn, DateTime DueDate, bool IsOverdue);
 
-    private async Task Initiate()
+    private static string ExtractError(string body, string fallback)
     {
-        isError = false; message = null;
-        if (paymentId <= 0 || string.IsNullOrWhiteSpace(email))
-        {
-            isError = true; message = "Payment ID and email are required."; return;
-        }
-        isSubmitting = true;
-        try
-        {
-            var client = HttpFactory.CreateClient("Api");
-            var res = await client.PostAsJsonAsync("/api/v1.0/Payments/initiate", new { paymentId, email });
-            var body = await res.Content.ReadAsStringAsync();
-            if (!res.IsSuccessStatusCode)
-            {
-                isError = true; message = body; return;
-            }
-            lastResult = System.Text.Json.JsonSerializer.Deserialize<InitiateResult>(body, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            message = "Initialized — open Paystack checkout or scan QR.";
-            if (lastResult is not null)
-                await LoadQr(lastResult.TransactionReference);
-        }
-        catch (Exception ex) { isError = true; message = ex.Message; }
-        finally { isSubmitting = false; }
+        try { using var doc = System.Text.Json.JsonDocument.Parse(body); if (doc.RootElement.TryGetProperty("error", out var value)) return value.GetString() ?? fallback; }
+        catch { }
+        return fallback;
     }
 
-    private async Task LoadQr(string reference)
-    {
-        qrLoading = true; qrError = null; qrPngData = null;
-        try
-        {
-            var client = HttpFactory.CreateClient("Api");
-            var response = await client.GetAsync($"/api/v1.0/Payments/{Uri.EscapeDataString(reference)}/qr?format=png");
-            if (!response.IsSuccessStatusCode)
-            {
-                qrError = "The QR could not be loaded. Open payment details to retry.";
-                return;
-            }
-            qrPngData = $"data:image/png;base64,{Convert.ToBase64String(await response.Content.ReadAsByteArrayAsync())}";
-        }
-        catch (Exception ex) { qrError = ex.Message; }
-        finally { qrLoading = false; }
-    }
-
-    private record InitiateResult(string TransactionReference, decimal Amount, string? AuthorizationUrl, string? AccessCode, string Status);
+    private record PaymentRow(int Id, decimal Amount, string Status, string? TransactionReference, DateTime? PaidOn, DateTime DueDate, bool IsOverdue, string? PaymentMethod, int AllocationId);
 }
