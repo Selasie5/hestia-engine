@@ -109,6 +109,11 @@ public class AuthService
             }
         }
         catch { }
+        await ClearLocalSessionAsync();
+    }
+
+    public async Task ClearLocalSessionAsync()
+    {
         await _storage.DeleteAsync(AccessTokenKey);
         await _storage.DeleteAsync(RefreshTokenKey);
         await _storage.DeleteAsync(ExpiresAtKey);

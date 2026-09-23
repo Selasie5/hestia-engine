@@ -3,8 +3,25 @@
 @rendermode InteractiveServer
 @using HostelSystem.Web.Services.Auth
 @attribute [AllowAnonymous]
+@implements IDisposable
 
 <PageTitle>Sign in — Hestia</PageTitle>
+
+@if (showSessionExpiredToast)
+{
+    <div class="session-toast" role="status" aria-live="polite" aria-atomic="true">
+        <span class="session-toast-icon" aria-hidden="true">
+            <UiIcon Name="key" />
+        </span>
+        <span class="session-toast-copy">
+            <strong>Your session expired</strong>
+            <span>Please sign in again to continue.</span>
+        </span>
+        <button type="button" class="session-toast-dismiss" aria-label="Dismiss notification" @onclick="DismissSessionToast">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+}
 
 <section class="auth-card">
     <header class="auth-card-header">
@@ -38,19 +55,59 @@
 
     <div class="auth-divider"><span>New to Hestia?</span></div>
     <a class="btn btn-outline-secondary w-100" href="/register">Create a student account</a>
-    <p class="auth-home-link"><a href="/">← Back to home</a> • <a href="/logout">Clear session / Sign out</a></p>
-    <p class="small text-muted">If you see 401 on <code>GET /Students/me</code>, your token is stale — click Clear session, then sign in again. Check F12 → Application → Local Storage.</p>
+    <p class="auth-home-link"><a href="/">← Back to home</a></p>
 </section>
 
 @code {
     [Inject] public AuthService Auth { get; set; } = default!;
     [Inject] public NavigationManager Nav { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
 
     private string email = "";
     private string password = "";
     private string? error;
     private string? info;
     private bool busy;
+    private bool showSessionExpiredToast;
+    private bool sessionNoticeHandled;
+    private CancellationTokenSource? toastCancellation;
+
+    protected override void OnParametersSet()
+    {
+        if (!sessionNoticeHandled && string.Equals(Notice, "session-expired", StringComparison.OrdinalIgnoreCase))
+        {
+            sessionNoticeHandled = true;
+            showSessionExpiredToast = true;
+            toastCancellation = new CancellationTokenSource();
+            _ = AutoDismissSessionToastAsync(toastCancellation.Token);
+        }
+    }
+
+    private async Task AutoDismissSessionToastAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            showSessionExpiredToast = false;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+            // The user dismissed the toast before the timeout elapsed.
+        }
+    }
+
+    private void DismissSessionToast()
+    {
+        toastCancellation?.Cancel();
+        showSessionExpiredToast = false;
+    }
+
+    public void Dispose()
+    {
+        toastCancellation?.Cancel();
+        toastCancellation?.Dispose();
+    }
 
     private async Task DoLogin()
     {

@@ -45,6 +45,15 @@ public class AuthHeaderHandler : DelegatingHandler
         if (authService is null || !await authService.TryRefreshAsync())
         {
             retryRequest.Dispose();
+
+            if (authService is not null)
+            {
+                await authService.ClearLocalSessionAsync();
+                var navigation = _services.GetService<Microsoft.AspNetCore.Components.NavigationManager>();
+                if (navigation is not null && !navigation.Uri.Contains("/login", StringComparison.OrdinalIgnoreCase))
+                    navigation.NavigateTo("/login?notice=session-expired");
+            }
+
             return response;
         }
 

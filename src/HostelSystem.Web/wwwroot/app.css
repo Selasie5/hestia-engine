@@ -149,6 +149,56 @@ code { color: #3457d5; }
 .auth-switch, .auth-home-link { margin: 1.2rem 0 0; color: #7a8599; font-size: .78rem; text-align: center; }
 .auth-switch a, .auth-home-link a { font-weight: 700; text-decoration: none; }
 .auth-home-link { margin-top: .8rem; font-size: .72rem; }
+.session-toast {
+    position: fixed;
+    z-index: 1080;
+    top: 1rem;
+    right: 1rem;
+    display: grid;
+    width: min(24rem, calc(100vw - 2rem));
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: .75rem;
+    padding: .8rem;
+    border-radius: .85rem;
+    color: var(--hestia-navy);
+    background: var(--hestia-surface);
+    box-shadow: 0 0 0 1px rgba(23,35,60,.07), 0 4px 12px rgba(23,35,60,.08), 0 18px 42px rgba(23,35,60,.12);
+    animation: session-toast-enter 220ms var(--motion-ease) both;
+}
+.session-toast-icon {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border-radius: .65rem;
+    color: var(--hestia-warning);
+    background: #fff5df;
+}
+.session-toast-icon .nav-icon { width: 20px; height: 20px; }
+.session-toast-copy { display: flex; min-width: 0; flex-direction: column; gap: .1rem; }
+.session-toast-copy strong { font-family: 'Manrope', sans-serif; font-size: .86rem; }
+.session-toast-copy > span { color: var(--hestia-muted); font-size: .78rem; }
+.session-toast-dismiss {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: .6rem;
+    color: var(--hestia-muted);
+    background: transparent;
+    font-size: 1.3rem;
+    line-height: 1;
+    transition: color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease), transform var(--motion-fast) var(--motion-ease);
+}
+.session-toast-dismiss:hover { color: var(--hestia-navy); background: var(--hestia-bg); }
+.session-toast-dismiss:active { transform: scale(.96); }
+@keyframes session-toast-enter {
+    from { opacity: 0; transform: translateY(-8px) scale(.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 /* Authenticated home */
 .portal-welcome { display: flex; align-items: flex-end; justify-content: space-between; gap: 2rem; padding: 2.3rem; border-radius: 1rem; color: #fff; background: linear-gradient(120deg,#2948b8,#4869e8); box-shadow: 0 14px 35px rgba(52,87,213,.18); }
