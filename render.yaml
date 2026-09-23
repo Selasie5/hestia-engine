@@ -19,6 +19,8 @@ services:
         value: "true"
       - key: ReverseProxy__TerminatesTls
         value: "true"
+      - key: Swagger__Enabled
+        value: "true"
       - key: DataProtection__KeysPath
         value: /data/data-protection-keys
       - key: DatabaseProvider

@@ -50,6 +50,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("Jwt:Issuer", "HostelSystem.Api");
         builder.UseSetting("Jwt:Audience", "HostelSystem.Web");
         builder.UseSetting("Jwt:AccessTokenExpiryMinutes", "60");
+        builder.UseSetting("Swagger:Enabled", "true");
     }
 
     protected override void Dispose(bool disposing)

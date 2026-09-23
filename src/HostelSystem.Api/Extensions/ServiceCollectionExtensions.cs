@@ -37,6 +37,7 @@ public static class ServiceCollectionExtensions
         app.UseSwaggerUI(options =>
         {
             options.SwaggerEndpoint("/swagger/v1/swagger.json", "Hostel API v1");
+            options.RoutePrefix = "swagger";
         });
 
         return app;

@@ -15,6 +15,13 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Bind to Render's PORT (defaults to 8080)
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(port))
+{
+    builder.WebHost.UseUrls($"http://+:{port}");
+}
+
 // ─── Serilog (structured logging with correlation IDs) ───
 builder.Host.UseSerilog((context, config) =>
     config.ReadFrom.Configuration(context.Configuration)
@@ -99,14 +106,12 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // ─── Middleware pipeline (order matters!) ───
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwaggerDocumentation();
-}
-else
+if (!app.Environment.IsDevelopment())
 {
     app.UseHsts();
 }
+
+app.UseSwaggerDocumentation();
 
 app.UseSerilogRequestLogging(); // Must come early — logs the HTTP request
 

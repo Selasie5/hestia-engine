@@ -33,6 +33,16 @@ public sealed class ApiSmokeTests : IClassFixture<CustomWebApplicationFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    [Theory]
+    [InlineData("/swagger/index.html")]
+    [InlineData("/swagger/v1/swagger.json")]
+    public async Task Swagger_WhenEnabled_ReturnsSuccess(string path)
+    {
+        using var response = await _client.GetAsync(path);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     [Fact]
     public async Task PublicHostels_ReturnsPagedContract()
     {

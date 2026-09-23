@@ -22,6 +22,8 @@ The Blueprint generates `Jwt__Secret`. Do not replace it after users begin signi
 
 The Blueprint also declares `PORT=8080`, matching the .NET container's default HTTP port, so Render does not need a discovery restart. `ReverseProxy__TerminatesTls=true` prevents the applications from trying to redirect Render's internal HTTP traffic to a nonexistent container HTTPS port. Render still provides HTTPS publicly at its load balancer.
 
+Swagger is explicitly enabled for the API service with `Swagger__Enabled=true`. After deployment, the interactive documentation is available at `https://<your-hestia-api-host>/swagger/index.html`, and the OpenAPI document is available at `/swagger/v1/swagger.json`.
+
 ## Configure Paystack
 
 After Render assigns the API URL, configure the Paystack webhook URL as:
@@ -49,11 +51,12 @@ Without SMTP configuration, the application retains its configured development/f
 ## Verify the deployment
 
 1. Open `https://<your-hestia-api-host>/health` and confirm a successful response.
-2. Open the web service URL and register a student account.
-3. Sign in and confirm hostel and room browsing.
-4. Submit an application, approve it from an admin account, and confirm that an allocation and payment are created.
-5. Initiate a Paystack test payment. Confirm that checkout opens, the protected QR renders, PNG/SVG downloads work, and verification updates the payment.
-6. Restart the API service and confirm existing records remain available. This verifies that SQLite is writing to `/data/hostelsystem.db` on the persistent disk.
+2. Open `https://<your-hestia-api-host>/swagger/index.html` and confirm the API documentation loads.
+3. Open the web service URL and register a student account.
+4. Sign in and confirm hostel and room browsing.
+5. Submit an application, approve it from an admin account, and confirm that an allocation and payment are created.
+6. Initiate a Paystack test payment. Confirm that checkout opens, the protected QR renders, PNG/SVG downloads work, and verification updates the payment.
+7. Restart the API service and confirm existing records remain available. This verifies that SQLite is writing to `/data/hostelsystem.db` on the persistent disk.
 
 The API's ASP.NET Core data-protection keys are stored under `/data/data-protection-keys`, so Identity token protection remains stable across API restarts. Render may still report that these XML keys are not application-level encrypted; the persistent disk is encrypted at rest, and a certificate-backed key encryptor can be added if your threat model requires separate key encryption.
 
@@ -65,6 +68,7 @@ The API's ASP.NET Core data-protection keys are stored under `/data/data-protect
 - **Render detects a new port and restarts once:** set `PORT=8080` on each manually created service. The checked-in Blueprint already does this.
 - **`Failed to determine the https port for redirect`:** set `ReverseProxy__TerminatesTls=true`. Render terminates public HTTPS before forwarding the request to the container.
 - **`HEAD /` returns 404:** redeploy the current API revision; it exposes a lightweight root status endpoint as well as `/health`.
+- **Swagger returns 404:** set `Swagger__Enabled=true` on the API service and redeploy. The checked-in Blueprint already includes this setting.
 - **Paystack returns configuration errors:** confirm the two Paystack environment variables and webhook URL, then redeploy the API.
 - **First page load is slow:** the free web service can spin down when idle. Move `hestia-web` to a paid plan to avoid cold starts.
 
