@@ -66,8 +66,6 @@ else
 
 @code {
     [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
-    [Inject] public IConfiguration Config { get; set; } = default!;
-    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
     private bool isLoading = true; private string? error;
     private Kpi kpi = new(0,0,0,0,0,0);
     private List<RecentApp> recent = new();
@@ -78,11 +76,11 @@ else
         try
         {
             var client = HttpFactory.CreateClient("Api");
-            var hostelsTask = client.GetAsync($"{apiBase}/api/v1.0/Hostels?onlyActive=false&page=1&pageSize=1");
-            var pendingTask = client.GetAsync($"{apiBase}/api/v1.0/Applications/pending?page=1&pageSize=5");
-            var allocsTask = client.GetAsync($"{apiBase}/api/v1.0/Allocations?page=1&pageSize=1");
-            var paysTask = client.GetAsync($"{apiBase}/api/v1.0/Payments?page=1&pageSize=100");
-            var paysCompTask = client.GetAsync($"{apiBase}/api/v1.0/Payments?status=Completed&page=1&pageSize=100");
+            var hostelsTask = client.GetAsync("/api/v1.0/Hostels?onlyActive=false&page=1&pageSize=1");
+            var pendingTask = client.GetAsync("/api/v1.0/Applications/pending?page=1&pageSize=5");
+            var allocsTask = client.GetAsync("/api/v1.0/Allocations?page=1&pageSize=1");
+            var paysTask = client.GetAsync("/api/v1.0/Payments?page=1&pageSize=100");
+            var paysCompTask = client.GetAsync("/api/v1.0/Payments?status=Completed&page=1&pageSize=100");
             await Task.WhenAll(hostelsTask, pendingTask, allocsTask, paysTask, paysCompTask);
 
             int hostels = 0, pending = 0, allocs = 0, pays = 0, over = 0; decimal rev = 0;

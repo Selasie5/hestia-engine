@@ -66,8 +66,6 @@ else
 
 @code {
     [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
-    [Inject] public IConfiguration Config { get; set; } = default!;
-    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
     private List<Row> items = new(); private bool isLoading = true; private string? error; private string? msg; private bool msgError;
     private int currentPage=1; private int pageSize=10; private int total; private int totalPages; private string? filterStatus;
     protected override async Task OnInitializedAsync() => await Load();
@@ -76,7 +74,7 @@ else
         isLoading = true; error=null;
         try{
             var client=HttpFactory.CreateClient("Api");
-            var url = $"{apiBase}/api/v1.0/Payments?page={currentPage}&pageSize={pageSize}";
+            var url = $"/api/v1.0/Payments?page={currentPage}&pageSize={pageSize}";
             if(!string.IsNullOrWhiteSpace(filterStatus)) url += $"&status={filterStatus}";
             var res=await client.GetAsync(url);
             var body=await res.Content.ReadAsStringAsync();
@@ -96,11 +94,11 @@ else
     }
     private async Task Verify(string reference)
     {
-        try{ var client=HttpFactory.CreateClient("Api"); var res=await client.GetAsync($"{apiBase}/api/v1.0/Payments/{reference}/verify"); var b=await res.Content.ReadAsStringAsync(); msg=b; msgError=!res.IsSuccessStatusCode; if(res.IsSuccessStatusCode) await Load(); } catch(Exception ex){ msg=ex.Message; msgError=true; }
+        try{ var client=HttpFactory.CreateClient("Api"); var res=await client.GetAsync($"/api/v1.0/Payments/{reference}/verify"); var b=await res.Content.ReadAsStringAsync(); msg=b; msgError=!res.IsSuccessStatusCode; if(res.IsSuccessStatusCode) await Load(); } catch(Exception ex){ msg=ex.Message; msgError=true; }
     }
     private async Task Refund(int id)
     {
-        try{ var client=HttpFactory.CreateClient("Api"); var res=await client.PostAsJsonAsync($"{apiBase}/api/v1.0/Payments/refund", new { paymentId = id }); var b=await res.Content.ReadAsStringAsync(); msg=b; msgError=!res.IsSuccessStatusCode; if(res.IsSuccessStatusCode) await Load(); } catch(Exception ex){ msg=ex.Message; msgError=true; }
+        try{ var client=HttpFactory.CreateClient("Api"); var res=await client.PostAsJsonAsync("/api/v1.0/Payments/refund", new { paymentId = id }); var b=await res.Content.ReadAsStringAsync(); msg=b; msgError=!res.IsSuccessStatusCode; if(res.IsSuccessStatusCode) await Load(); } catch(Exception ex){ msg=ex.Message; msgError=true; }
     }
     private async Task Prev(){ if(currentPage>1){currentPage--; await Load();} }
     private async Task Next(){ if(currentPage<totalPages){currentPage++; await Load();} }

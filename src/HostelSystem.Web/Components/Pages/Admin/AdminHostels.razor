@@ -3,104 +3,186 @@
 @using System.Net.Http.Json
 @attribute [Authorize(Roles = "Admin")]
 
-<PageTitle>Hostels Admin — HostelSystem</PageTitle>
+<PageTitle>Hostels & Rooms — Hestia Admin</PageTitle>
 
-<h3>Hostels — Admin</h3>
+<header class="admin-heading">
+    <div><span class="eyebrow">Property inventory</span><h1>Hostels & rooms</h1><p>Manage accommodation properties, capacity, and room inventory.</p></div>
+    <button class="btn btn-primary" @onclick="OpenCreateHostel">+ Add hostel</button>
+</header>
 
-<div class="card mb-3" style="max-width:560px">
-    <div class="card-body">
-        <h6>Create Hostel</h6>
-        <input class="form-control mb-2" @bind="newName" placeholder="Name" />
-        <input class="form-control mb-2" @bind="newAddress" placeholder="Address" />
-        <input class="form-control mb-2" @bind="newDesc" placeholder="Description (optional)" />
-        <button class="btn btn-sm btn-primary" @onclick="Create" disabled="@busy">Create</button>
-    </div>
-</div>
-
-<button class="btn btn-sm btn-outline-secondary mb-2" @onclick="Load">Refresh</button>
 @if (isLoading)
 {
-    <p>Loading...</p>
+    <div class="loading-inline"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Loading hostel inventory…</span></div>
 }
 else if (!string.IsNullOrWhiteSpace(error))
 {
-    <div class="alert alert-danger">@error</div>
+    <section class="admin-state" role="alert"><h2>We couldn’t load the hostel inventory</h2><p>@error</p><button class="btn btn-primary" @onclick="Load">Try again</button></section>
+}
+else if (items.Count == 0)
+{
+    <section class="admin-state"><h2>No hostels have been added</h2><p>Create the first hostel and add its initial rooms in one guided flow.</p><button class="btn btn-primary" @onclick="OpenCreateHostel">Add first hostel</button></section>
 }
 else
 {
-    <table class="table table-sm">
-        <thead><tr><th>#</th><th>Name</th><th>Address</th><th>Active</th><th>Rooms</th><th>Action</th></tr></thead>
-        <tbody>
-            @foreach (var h in items)
-            {
-                <tr>
-                    <td>@h.Id</td>
-                    <td>@h.Name</td>
-                    <td><small>@h.Address</small></td>
-                    <td><span class="badge @(h.IsActive?"bg-success":"bg-warning")">@(h.IsActive?"Active":"Inactive")</span></td>
-                    <td>@h.TotalCapacity / @h.AvailableSpots avail</td>
-                    <td>
-                        @if (h.IsActive)
-                        {
-                            <button class="btn btn-sm btn-outline-warning" @onclick="() => Deactivate(h.Id)">Deactivate</button>
-                        }
-                        else
-                        {
-                            <button class="btn btn-sm btn-outline-success" @onclick="() => Activate(h.Id)">Activate</button>
-                        }
-                        <a class="btn btn-sm btn-outline-primary ms-1" href="/hostels/@h.Id">Rooms</a>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <section class="inventory-card">
+        <div class="inventory-toolbar"><span>@items.Count properties</span><button class="btn btn-sm btn-outline-secondary" @onclick="Load">Refresh</button></div>
+        <div class="table-responsive">
+            <table class="table inventory-table">
+                <thead><tr><th>Hostel</th><th>Status</th><th>Capacity</th><th>Availability</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+                <tbody>
+                    @foreach (var hostel in items)
+                    {
+                        <tr>
+                            <td><strong>@hostel.Name</strong><small>@hostel.Address</small></td>
+                            <td><span class="inventory-status @(hostel.IsActive ? "active" : null)">@(hostel.IsActive ? "Active" : "Inactive")</span></td>
+                            <td>@hostel.TotalCapacity beds</td>
+                            <td><strong>@hostel.AvailableSpots</strong> available</td>
+                            <td class="inventory-actions">
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenAddRooms(hostel)">Add rooms</button>
+                                <a class="btn btn-sm btn-outline-secondary" href="@($"/hostels/{hostel.Id}")">View</a>
+                                <button class="btn btn-sm @(hostel.IsActive ? "btn-outline-danger" : "btn-outline-success")" @onclick="() => ToggleActive(hostel)">@(hostel.IsActive ? "Deactivate" : "Activate")</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
 }
-@if (!string.IsNullOrWhiteSpace(msg))
+
+@if (!string.IsNullOrWhiteSpace(message))
 {
-    <div class="alert @(msgError?"alert-danger":"alert-success")">@msg</div>
+    <div class="alert @(messageError ? "alert-danger" : "alert-success") mt-3" role="status">@message</div>
+}
+
+@if (modalOpen)
+{
+    <div class="modal-backdrop-custom" @onclick="CloseModal"></div>
+    <section class="wizard-modal" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
+        <header class="wizard-header"><div><span class="eyebrow">@(creatingHostel ? "New property" : selectedHostel?.Name)</span><h2 id="wizard-title">@(creatingHostel ? "Create hostel and rooms" : "Add rooms")</h2></div><button class="modal-close" aria-label="Close" @onclick="CloseModal">×</button></header>
+        <ol class="wizard-steps" aria-label="Progress">
+            @if (creatingHostel) { <li class="@(wizardStep >= 1 ? "current" : null)"><span>1</span>Hostel</li> }
+            <li class="@(wizardStep >= RoomStep ? "current" : null)"><span>@RoomStep</span>Rooms</li>
+            <li class="@(wizardStep >= ReviewStep ? "current" : null)"><span>@ReviewStep</span>Review</li>
+        </ol>
+
+        <div class="wizard-body">
+            @if (creatingHostel && wizardStep == 1)
+            {
+                <div class="wizard-copy"><h3>Hostel details</h3><p>Add the information students will use to identify this property.</p></div>
+                <div class="form-grid-modal"><div class="field-full"><label for="hostel-name">Hostel name</label><input id="hostel-name" class="form-control" @bind="newName" placeholder="e.g. Akuafo Hall" /></div><div class="field-full"><label for="hostel-address">Address</label><input id="hostel-address" class="form-control" @bind="newAddress" placeholder="Campus location or address" /></div><div class="field-full"><label for="hostel-description">Description <span>Optional</span></label><textarea id="hostel-description" class="form-control" rows="3" @bind="newDescription" placeholder="A short description for students"></textarea></div></div>
+            }
+            else if (wizardStep == RoomStep)
+            {
+                <div class="wizard-copy"><h3>Add room inventory</h3><p>Add one or more rooms. You can add more rooms later.</p></div>
+                <div class="room-entry"><div><label for="room-number">Room number</label><input id="room-number" class="form-control" @bind="roomNumber" placeholder="e.g. AK101" /></div><div><label for="room-capacity">Capacity</label><input id="room-capacity" class="form-control" type="number" min="1" @bind="roomCapacity" /></div><div><label for="room-price">Price / semester</label><input id="room-price" class="form-control" type="number" min="0" step="0.01" @bind="roomPrice" /></div><button class="btn btn-outline-primary" @onclick="AddRoomDraft" disabled="@(!CanAddRoom)">Add room</button></div>
+                @if (roomDrafts.Count > 0)
+                {
+                    <div class="room-draft-list">@foreach (var room in roomDrafts) { <div><span><strong>@room.RoomNumber</strong><small>@room.Capacity beds · GHS @room.PricePerSemester.ToString("N2")</small></span><button aria-label="Remove room @room.RoomNumber" @onclick="() => roomDrafts.Remove(room)">×</button></div> }</div>
+                }
+                else
+                {
+                    <div class="rooms-empty">No rooms added yet.</div>
+                }
+            }
+            else if (wizardStep == ReviewStep)
+            {
+                <div class="wizard-copy"><h3>Review and confirm</h3><p>Check these details before saving the changes.</p></div>
+                <div class="review-panel">@if (creatingHostel) { <div><span>Hostel</span><strong>@newName</strong><small>@newAddress</small></div> }<div><span>Rooms to add</span><strong>@roomDrafts.Count</strong><small>@roomDrafts.Sum(r => r.Capacity) total beds</small></div><div><span>Semester value</span><strong>GHS @roomDrafts.Sum(r => r.PricePerSemester * r.Capacity).ToString("N2")</strong><small>At full occupancy</small></div></div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(modalError)) { <div class="alert alert-danger mt-3" role="alert">@modalError</div> }
+        </div>
+        <footer class="wizard-footer"><button class="btn btn-outline-secondary" @onclick="PreviousStep" disabled="@(wizardStep == 1 || (!creatingHostel && wizardStep == RoomStep))">Back</button><div><button class="btn btn-light" @onclick="CloseModal">Cancel</button>@if (wizardStep < ReviewStep) { <button class="btn btn-primary" @onclick="NextStep" disabled="@(!CanContinue)">Continue</button> } else { <button class="btn btn-primary" @onclick="SaveWizard" disabled="@busy">@(busy ? "Saving…" : creatingHostel ? "Create hostel" : "Add rooms")</button> }</div></footer>
+    </section>
 }
 
 @code {
     [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
-    [Inject] public IConfiguration Config { get; set; } = default!;
-    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
-    private List<Row> items = new(); private bool isLoading = true; private string? error; private string? msg; private bool msgError; private bool busy;
-    private string newName=""; private string newAddress=""; private string newDesc="";
+    private readonly System.Text.Json.JsonSerializerOptions jsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private List<HostelRow> items = new();
+    private bool isLoading = true, busy, messageError, modalOpen, creatingHostel;
+    private string? error, message, modalError;
+    private HostelRow? selectedHostel;
+    private int wizardStep = 1;
+    private string newName = "", newAddress = "", newDescription = "";
+    private string roomNumber = "";
+    private int roomCapacity = 1;
+    private decimal roomPrice;
+    private List<RoomDraft> roomDrafts = new();
+    private int RoomStep => creatingHostel ? 2 : 1;
+    private int ReviewStep => creatingHostel ? 3 : 2;
+    private bool CanAddRoom => !string.IsNullOrWhiteSpace(roomNumber) && roomCapacity > 0 && roomPrice >= 0;
+    private bool CanContinue => wizardStep == 1 && creatingHostel ? !string.IsNullOrWhiteSpace(newName) && !string.IsNullOrWhiteSpace(newAddress) : wizardStep == RoomStep && roomDrafts.Count > 0;
+
     protected override async Task OnInitializedAsync() => await Load();
     private async Task Load()
     {
-        isLoading=true;
-        try{
-            var client=HttpFactory.CreateClient("Api");
-            var res=await client.GetAsync($"{apiBase}/api/v1.0/Hostels?onlyActive=false&page=1&pageSize=50");
-            var body=await res.Content.ReadAsStringAsync();
-            if(!res.IsSuccessStatusCode){ error=body; return; }
-            var doc=System.Text.Json.JsonDocument.Parse(body);
-            var arr = doc.RootElement.TryGetProperty("items", out var it) ? it : doc.RootElement;
-            items=new();
-            if (arr.ValueKind== System.Text.Json.JsonValueKind.Array)
-                foreach(var el in arr.EnumerateArray()) items.Add(Parse(el));
-            else if (doc.RootElement.TryGetProperty("items", out var its2))
-                foreach(var el in its2.EnumerateArray()) items.Add(Parse(el));
-            else
-                foreach(var el in doc.RootElement.EnumerateArray()) items.Add(Parse(el));
-        } catch(Exception ex){ error=ex.Message; } finally{ isLoading=false; }
+        isLoading = true; error = null;
+        try
+        {
+            var response = await HttpFactory.CreateClient("Api").GetAsync("/api/v1.0/Hostels?onlyActive=false&page=1&pageSize=50");
+            var body = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode) { error = ExtractError(body, "We couldn’t load the hostel inventory."); return; }
+            var result = System.Text.Json.JsonSerializer.Deserialize<PagedResult<HostelRow>>(body, jsonOptions);
+            items = result?.Items?.ToList() ?? new();
+        }
+        catch (Exception) { error = "The hostel service is temporarily unavailable. Please try again."; }
+        finally { isLoading = false; }
     }
-    private Row Parse(System.Text.Json.JsonElement el) => new Row(el.GetProperty("id").GetInt32(), el.GetProperty("name").GetString()??"", el.TryGetProperty("address", out var a)?a.GetString()??"":"", el.GetProperty("isActive").GetBoolean(), el.GetProperty("totalCapacity").GetInt32(), el.GetProperty("availableSpots").GetInt32());
-    private async Task Create()
+
+    private void OpenCreateHostel() { ResetWizard(); creatingHostel = true; wizardStep = 1; modalOpen = true; }
+    private void OpenAddRooms(HostelRow hostel) { ResetWizard(); creatingHostel = false; selectedHostel = hostel; wizardStep = 1; modalOpen = true; }
+    private void CloseModal() { if (busy) return; modalOpen = false; }
+    private void ResetWizard() { modalError = null; selectedHostel = null; newName = newAddress = newDescription = roomNumber = ""; roomCapacity = 1; roomPrice = 0; roomDrafts = new(); }
+    private void NextStep() { if (CanContinue) { modalError = null; wizardStep++; } }
+    private void PreviousStep() { if (wizardStep > 1) { modalError = null; wizardStep--; } }
+    private void AddRoomDraft() { if (!CanAddRoom) return; if (roomDrafts.Any(r => r.RoomNumber.Equals(roomNumber.Trim(), StringComparison.OrdinalIgnoreCase))) { modalError = "Room numbers must be unique in this batch."; return; } roomDrafts.Add(new(roomNumber.Trim(), roomCapacity, roomPrice)); roomNumber = ""; roomCapacity = 1; roomPrice = 0; modalError = null; }
+
+    private async Task SaveWizard()
     {
-        busy=true; msg=null;
-        try{
-            var client=HttpFactory.CreateClient("Api");
-            var res=await client.PostAsJsonAsync($"{apiBase}/api/v1.0/Hostels", new { name = newName, address = newAddress, description = string.IsNullOrWhiteSpace(newDesc)? null : newDesc });
-            var b=await res.Content.ReadAsStringAsync(); msg=b; msgError=!res.IsSuccessStatusCode;
-            if(res.IsSuccessStatusCode){ newName=""; newAddress=""; newDesc=""; await Load(); }
-        } catch(Exception ex){ msg=ex.Message; msgError=true; } finally{ busy=false; }
+        busy = true; modalError = null;
+        try
+        {
+            var client = HttpFactory.CreateClient("Api");
+            var hostelId = selectedHostel?.Id ?? 0;
+            if (creatingHostel)
+            {
+                var hostelResponse = await client.PostAsJsonAsync("/api/v1.0/Hostels", new { name = newName.Trim(), address = newAddress.Trim(), description = string.IsNullOrWhiteSpace(newDescription) ? null : newDescription.Trim() });
+                var hostelBody = await hostelResponse.Content.ReadAsStringAsync();
+                if (!hostelResponse.IsSuccessStatusCode) { modalError = ExtractError(hostelBody, "We couldn’t create this hostel."); return; }
+                hostelId = System.Text.Json.JsonSerializer.Deserialize<HostelRow>(hostelBody, jsonOptions)?.Id ?? 0;
+                if (hostelId == 0) { modalError = "The hostel was created but its identifier was not returned."; return; }
+            }
+
+            foreach (var room in roomDrafts)
+            {
+                var roomResponse = await client.PostAsJsonAsync("/api/v1.0/Rooms", new { roomNumber = room.RoomNumber, capacity = room.Capacity, pricePerSemester = room.PricePerSemester, hostelId });
+                if (!roomResponse.IsSuccessStatusCode) { modalError = $"Hostel saved, but room {room.RoomNumber} could not be added: {ExtractError(await roomResponse.Content.ReadAsStringAsync(), "Unknown room error.")}"; return; }
+            }
+            message = creatingHostel ? $"{newName} and {roomDrafts.Count} room(s) created." : $"{roomDrafts.Count} room(s) added to {selectedHostel?.Name}.";
+            messageError = false; modalOpen = false; await Load();
+        }
+        catch (Exception) { modalError = "The hostel service is temporarily unavailable. Please try again."; }
+        finally { busy = false; }
     }
-    private async Task Deactivate(int id){ var c=HttpFactory.CreateClient("Api"); var r=await c.PostAsync($"{apiBase}/api/v1.0/Hostels/{id}/deactivate", null); msg=await r.Content.ReadAsStringAsync(); msgError=!r.IsSuccessStatusCode; if(r.IsSuccessStatusCode) await Load(); }
-    private async Task Activate(int id){ var c=HttpFactory.CreateClient("Api"); var r=await c.PostAsync($"{apiBase}/api/v1.0/Hostels/{id}/activate", null); msg=await r.Content.ReadAsStringAsync(); msgError=!r.IsSuccessStatusCode; if(r.IsSuccessStatusCode) await Load(); }
-    private record Row(int Id, string Name, string Address, bool IsActive, int TotalCapacity, int AvailableSpots);
+
+    private async Task ToggleActive(HostelRow hostel)
+    {
+        try
+        {
+            var action = hostel.IsActive ? "deactivate" : "activate";
+            var response = await HttpFactory.CreateClient("Api").PostAsync($"/api/v1.0/Hostels/{hostel.Id}/{action}", null);
+            var body = await response.Content.ReadAsStringAsync();
+            message = response.IsSuccessStatusCode ? $"{hostel.Name} was {(hostel.IsActive ? "deactivated" : "activated")}." : ExtractError(body, "We couldn’t update this hostel.");
+            messageError = !response.IsSuccessStatusCode;
+            if (response.IsSuccessStatusCode) await Load();
+        }
+        catch (Exception) { message = "The hostel service is temporarily unavailable."; messageError = true; }
+    }
+
+    private static string ExtractError(string body, string fallback) { try { using var doc = System.Text.Json.JsonDocument.Parse(body); if (doc.RootElement.TryGetProperty("error", out var value)) return value.GetString() ?? fallback; } catch { } return fallback; }
+    private record HostelRow(int Id, string Name, string? Description, string Address, bool IsActive, int TotalCapacity, int TotalOccupancy, int AvailableSpots);
+    private record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize, int TotalPages);
+    private record RoomDraft(string RoomNumber, int Capacity, decimal PricePerSemester);
 }
-
-
-

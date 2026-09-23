@@ -69,8 +69,6 @@ else
 
 @code {
     [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
-    [Inject] public IConfiguration Config { get; set; } = default!;
-    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
     private List<Row> items = new(); private bool isLoading = true; private string? error; private string? msg; private bool msgError; private int? busy;
     private int currentPage = 1; private int pageSize = 10; private int total; private int totalPages;
     private bool showReject; private int rejectId; private string rejectReason = "";
@@ -82,9 +80,9 @@ else
         try
         {
             var client = HttpFactory.CreateClient("Api");
-            var res = await client.GetAsync($"{apiBase}/api/v1.0/Applications/pending?page={currentPage}&pageSize={pageSize}");
+            var res = await client.GetAsync($"/api/v1.0/Applications/pending?page={currentPage}&pageSize={pageSize}");
             var body = await res.Content.ReadAsStringAsync();
-            if (!res.IsSuccessStatusCode) { error = body; return; }
+            if (!res.IsSuccessStatusCode) { error = ExtractError(body, "We couldn’t load pending applications."); return; }
             var doc = System.Text.Json.JsonDocument.Parse(body);
             total = doc.RootElement.GetProperty("total").GetInt32();
             totalPages = (int)Math.Ceiling(total / (double)pageSize);
@@ -92,7 +90,7 @@ else
             foreach (var el in doc.RootElement.GetProperty("items").EnumerateArray())
                 items.Add(new Row(el.GetProperty("id").GetInt32(), el.GetProperty("studentName").GetString()??"", el.GetProperty("studentNumber").GetString()??"", el.GetProperty("roomNumber").GetString()??"", el.GetProperty("hostelName").GetString()??"", el.GetProperty("applicationDate").GetDateTime(), el.TryGetProperty("additionalNotes", out var n) && n.ValueKind!= System.Text.Json.JsonValueKind.Null ? n.GetString() : null));
         }
-        catch (Exception ex) { error = ex.Message; }
+        catch (Exception) { error = "The applications service is temporarily unavailable. Please try again."; }
         finally { isLoading = false; }
     }
     private async Task Approve(int id)
@@ -101,13 +99,13 @@ else
         try
         {
             var client = HttpFactory.CreateClient("Api");
-            var res = await client.PostAsJsonAsync($"{apiBase}/api/v1.0/Applications/{id}/approve", new { applicationId = id, reviewedBy = "admin" });
+            var res = await client.PostAsJsonAsync($"/api/v1.0/Applications/{id}/approve", new { applicationId = id, reviewedBy = "admin" });
             var body = await res.Content.ReadAsStringAsync();
-            msg = res.IsSuccessStatusCode ? $"Approved {id}" : body; msgError = !res.IsSuccessStatusCode;
+            msg = res.IsSuccessStatusCode ? $"Application #{id} approved." : ExtractError(body, "We couldn’t approve this application."); msgError = !res.IsSuccessStatusCode;
             if (res.IsSuccessStatusCode) await Load();
             if ((int)res.StatusCode == 409) msg = "Conflict: room version/occupancy changed — refresh.";
         }
-        catch (Exception ex) { msg = ex.Message; msgError = true; }
+        catch (Exception) { msg = "The applications service is temporarily unavailable."; msgError = true; }
         finally { busy = null; }
     }
     private void PromptReject(int id) { rejectId = id; rejectReason = ""; showReject = true; }
@@ -117,16 +115,22 @@ else
         try
         {
             var client = HttpFactory.CreateClient("Api");
-            var res = await client.PostAsJsonAsync($"{apiBase}/api/v1.0/Applications/{rejectId}/reject", new { reason = rejectReason });
+            var res = await client.PostAsJsonAsync($"/api/v1.0/Applications/{rejectId}/reject", new { reason = rejectReason });
             var body = await res.Content.ReadAsStringAsync();
-            msg = res.IsSuccessStatusCode ? $"Rejected {rejectId}" : body; msgError = !res.IsSuccessStatusCode;
+            msg = res.IsSuccessStatusCode ? $"Application #{rejectId} rejected." : ExtractError(body, "We couldn’t reject this application."); msgError = !res.IsSuccessStatusCode;
             if (res.IsSuccessStatusCode) { showReject = false; await Load(); }
         }
-        catch (Exception ex) { msg = ex.Message; msgError = true; }
+        catch (Exception) { msg = "The applications service is temporarily unavailable."; msgError = true; }
         finally { busy = null; }
     }
     private async Task Prev() { if (currentPage>1){ currentPage--; await Load(); } }
     private async Task Next() { if (currentPage<totalPages){ currentPage++; await Load(); } }
+    private static string ExtractError(string body, string fallback)
+    {
+        try { using var doc = System.Text.Json.JsonDocument.Parse(body); if (doc.RootElement.TryGetProperty("error", out var value)) return value.GetString() ?? fallback; }
+        catch { }
+        return fallback;
+    }
 
     private record Row(int Id, string StudentName, string StudentNumber, string RoomNumber, string HostelName, DateTime ApplicationDate, string? AdditionalNotes);
 }
