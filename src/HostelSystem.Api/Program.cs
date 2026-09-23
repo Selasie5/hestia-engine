@@ -143,9 +143,11 @@ using (var migrationScope = app.Services.CreateScope())
     await migrationScope.ServiceProvider.GetRequiredService<AppIdentityDbContext>().Database.MigrateAsync();
 }
 
-// ─── Seed / Reset (dev + CLI) ───
+// ─── Seed / Reset (dev + CLI + opt-in prod flag) ───
 bool shouldReset = args.Contains("--seed-reset", StringComparer.OrdinalIgnoreCase);
-bool shouldSeed = shouldReset || app.Environment.IsDevelopment();
+bool shouldSeed = shouldReset
+    || app.Environment.IsDevelopment()
+    || builder.Configuration.GetValue<bool>("SeedOnStartup");
 
 if (shouldSeed)
 {
