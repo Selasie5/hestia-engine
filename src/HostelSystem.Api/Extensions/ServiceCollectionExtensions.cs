@@ -26,7 +26,12 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddSwaggerDocumentation(this IServiceCollection services)
     {
         services.AddEndpointsApiExplorer();
-        services.AddSwaggerGen();
+        services.AddSwaggerGen(options =>
+        {
+            // Nested DTOs like PaymentsController.CancelRequest vs
+            // ApplicationsController.CancelRequest otherwise collide on schemaId.
+            options.CustomSchemaIds(type => type.FullName!.Replace("+", "."));
+        });
 
         return services;
     }
