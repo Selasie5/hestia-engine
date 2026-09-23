@@ -13,8 +13,14 @@ services:
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
+      - key: PORT
+        value: "8080"
       - key: ASPNETCORE_FORWARDEDHEADERS_ENABLED
         value: "true"
+      - key: ReverseProxy__TerminatesTls
+        value: "true"
+      - key: DataProtection__KeysPath
+        value: /data/data-protection-keys
       - key: DatabaseProvider
         value: Sqlite
       - key: ConnectionStrings__DefaultConnection
@@ -40,7 +46,11 @@ services:
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
+      - key: PORT
+        value: "8080"
       - key: ASPNETCORE_FORWARDEDHEADERS_ENABLED
+        value: "true"
+      - key: ReverseProxy__TerminatesTls
         value: "true"
       - key: ApiHostPort
         fromService:

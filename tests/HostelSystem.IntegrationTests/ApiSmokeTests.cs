@@ -25,6 +25,15 @@ public sealed class ApiSmokeTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task RootHeadProbe_ReturnsSuccess()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Head, "/");
+        using var response = await _client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task PublicHostels_ReturnsPagedContract()
     {
         using var response = await _client.GetAsync("/api/v1.0/Hostels?onlyActive=false&page=1&pageSize=10");

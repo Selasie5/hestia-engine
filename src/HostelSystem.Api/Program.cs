@@ -7,6 +7,7 @@ using HostelSystem.Infrastructure;
 using HostelSystem.Infrastructure.Persistence;
 using HostelSystem.Identity.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -24,6 +25,15 @@ builder.Host.UseSerilog((context, config) =>
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddIdentityServices(builder.Configuration);
+
+var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    Directory.CreateDirectory(dataProtectionKeysPath);
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
+        .SetApplicationName("HostelSystem.Api");
+}
 
 // ─── Controllers + API versioning + Swagger ───
 builder.Services.AddControllers();
@@ -102,13 +112,22 @@ app.UseSerilogRequestLogging(); // Must come early — logs the HTTP request
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
-app.UseHttpsRedirection();
+if (!builder.Configuration.GetValue<bool>("ReverseProxy:TerminatesTls"))
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors("AllowBlazorClient");
 
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapMethods("/", [HttpMethods.Get, HttpMethods.Head], () => Results.Ok(new
+{
+    service = "HostelSystem.Api",
+    status = "ok",
+    health = "/health"
+}));
 app.MapControllers();
 app.MapHealthChecks("/health");
 
