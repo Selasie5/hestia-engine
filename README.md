@@ -96,6 +96,15 @@ CI: `.github/workflows/ci.yml` — restore → build Release → test (trx+cover
 - `docs/email-setup.md` — SMTP/Mailtrap + console fallback
 - `docs/render-deployment.md` — Render Blueprint deployment, persistence, Paystack, and verification
 
+Platform  Core URI
+  https://hestia-api-tqud.onrender.com
+
+  Swagger Endpoint: 
+  https://hestia-api-tqud.onrender.com/swagger/index.html
+
+  Platform Web: 
+  https://hestia-web-kna0.onrender.com
+
 ## License
 
 MIT — team project.
