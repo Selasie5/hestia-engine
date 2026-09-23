@@ -13,13 +13,23 @@
                         <span class="header-eyebrow">Hestia portal</span>
                         <strong>@(authContext.User.IsInRole("Admin") ? "Administration workspace" : "Student accommodation")</strong>
                     </div>
-                    <div class="header-profile">
-                        <span class="profile-copy">
-                            <strong>@DisplayName(authContext.User)</strong>
-                            <small>@(authContext.User.IsInRole("Admin") ? "Administrator" : "Student")</small>
-                        </span>
-                        <span class="profile-avatar">@Initial(authContext.User)</span>
-                    </div>
+                    <details class="profile-menu">
+                        <summary aria-label="Open account menu for @DisplayName(authContext.User)">
+                            <span class="profile-copy">
+                                <strong>@DisplayName(authContext.User)</strong>
+                                <small>@(authContext.User.IsInRole("Admin") ? "Administrator" : "Student")</small>
+                            </span>
+                            <span class="profile-avatar" aria-hidden="true">@Initial(authContext.User)</span>
+                            <UiIcon Name="chevron-down" />
+                        </summary>
+                        <div class="profile-popover">
+                            <div class="profile-popover-heading">
+                                <span class="profile-avatar" aria-hidden="true">@Initial(authContext.User)</span>
+                                <span><strong>@DisplayName(authContext.User)</strong><small>Signed in</small></span>
+                            </div>
+                            <a href="/logout"><UiIcon Name="logout" /> Sign out</a>
+                        </div>
+                    </details>
                 </header>
 
                 <article class="content">

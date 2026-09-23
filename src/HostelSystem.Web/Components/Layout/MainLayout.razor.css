@@ -50,11 +50,26 @@
     font-size: .95rem;
 }
 
-.header-profile {
+.profile-menu {
+    position: relative;
+}
+
+.profile-menu > summary {
     display: flex;
     align-items: center;
     gap: .8rem;
+    min-height: 48px;
+    padding: .3rem .35rem .3rem .65rem;
+    border-radius: .8rem;
+    cursor: pointer;
+    list-style: none;
+    transition: background-color 150ms cubic-bezier(.2, 0, 0, 1);
 }
+
+.profile-menu > summary::-webkit-details-marker { display: none; }
+.profile-menu > summary:hover, .profile-menu[open] > summary { background: #f2f5fb; }
+.profile-menu > summary ::deep .nav-icon { width: 16px; height: 16px; color: #8b95a7; transition: transform 150ms cubic-bezier(.2, 0, 0, 1); }
+.profile-menu[open] > summary ::deep .nav-icon { transform: rotate(180deg); }
 
 .profile-copy {
     display: flex;
@@ -78,6 +93,25 @@
     font-size: .85rem;
     font-weight: 800;
 }
+
+.profile-popover {
+    position: absolute;
+    top: calc(100% + .55rem);
+    right: 0;
+    width: 250px;
+    padding: .5rem;
+    border-radius: .85rem;
+    background: #fff;
+    box-shadow: 0 0 0 1px rgba(23,35,60,.07), 0 18px 45px rgba(23,35,60,.14);
+}
+
+.profile-popover-heading { display: flex; align-items: center; gap: .75rem; padding: .6rem; border-bottom: 1px solid #edf0f5; }
+.profile-popover-heading > span:last-child { display: flex; min-width: 0; flex-direction: column; }
+.profile-popover-heading strong { overflow: hidden; font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }
+.profile-popover-heading small { color: #8b95a7; font-size: .7rem; }
+.profile-popover a { display: flex; min-height: 44px; align-items: center; gap: .65rem; margin-top: .35rem; padding: .6rem .7rem; border-radius: .6rem; color: #a33a31; font-size: .82rem; font-weight: 700; text-decoration: none; }
+.profile-popover a:hover { color: #8e2f27; background: #fff3f1; }
+.profile-popover a ::deep .nav-icon { width: 18px; height: 18px; }
 
 .content {
     width: 100%;
@@ -165,9 +199,11 @@
     }
 
     .header-eyebrow,
-    .profile-copy {
-        display: none;
-    }
+        .profile-menu > summary > .profile-copy {
+            display: none;
+        }
+
+        .profile-menu > summary { gap: .35rem; padding-left: .35rem; }
 
     .content {
         padding: 1.5rem 1rem 2.5rem;

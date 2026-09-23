@@ -1,56 +1,55 @@
 @page "/hostels"
-@rendermode InteractiveServer
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
 
 <PageTitle>Hostels — HostelSystem</PageTitle>
 
-<h3>Hostels</h3>
-<p class="text-muted">Browse hostels and available rooms.</p>
+<header class="hostel-heading">
+    <div>
+        <span class="eyebrow">Accommodation directory</span>
+        <h1>Find your next home</h1>
+        <p>Compare active hostels and check live room availability before you apply.</p>
+    </div>
+    @if (!isLoading && string.IsNullOrWhiteSpace(error))
+    {
+        <div class="availability-summary"><strong>@hostels.Sum(h => h.AvailableSpots)</strong><span>spaces on this page</span></div>
+    }
+</header>
 
 @if (isLoading)
 {
-    <p>Loading...</p>
+    <div class="hostel-grid" aria-label="Loading hostels" aria-busy="true">
+        @for (var i = 0; i < 6; i++) { <div class="hostel-card skeleton-card"><span></span><span></span><span></span></div> }
+    </div>
 }
 else if (!string.IsNullOrWhiteSpace(error))
 {
-    <div class="alert alert-danger">@error</div>
+    <section class="hostel-state" role="alert"><span class="state-icon">!</span><h2>We couldn’t load the hostels</h2><p>@error</p><button class="btn btn-primary" @onclick="Load">Try again</button></section>
+}
+else if (hostels.Count == 0)
+{
+    <section class="hostel-state"><span class="state-icon"><UiIcon Name="building" /></span><h2>No hostels available yet</h2><p>Check back later or contact the accommodation office for help.</p></section>
 }
 else
 {
-    <div class="row g-3">
+    <div class="hostel-grid">
         @foreach (var h in hostels)
         {
-            <div class="col-md-6 col-lg-4">
-                <div class="card h-100 @(h.IsActive ? "" : "border-warning")">
-                    <div class="card-body">
-                        <h5 class="card-title">@h.Name <small class="text-muted">#@h.Id</small></h5>
-                        <p class="card-text">@h.Address</p>
-                        <p class="card-text"><small class="text-muted">@h.Description</small></p>
-                        <div class="d-flex gap-2 mb-2">
-                            <span class="badge bg-primary">@h.TotalCapacity capacity</span>
-                            <span class="badge bg-success">@h.AvailableSpots available</span>
-                            <span class="badge @(h.IsActive ? "bg-success" : "bg-warning text-dark")">@(h.IsActive ? "Active" : "Inactive")</span>
-                        </div>
-                        <p class="mb-1"><small>Occupancy: @h.TotalOccupancy / @h.TotalCapacity</small></p>
-                        <a class="btn btn-sm btn-outline-primary" href="/hostels/@h.Id">View rooms</a>
-                    </div>
-                </div>
-            </div>
+            <article class="hostel-card">
+                <div class="hostel-card-top"><span class="hostel-symbol"><UiIcon Name="building" /></span><span class="availability-pill @(h.AvailableSpots == 0 ? "full" : null)">@(h.AvailableSpots == 0 ? "Currently full" : $"{h.AvailableSpots} spaces")</span></div>
+                <div class="hostel-copy"><h2>@h.Name</h2><p class="hostel-address"><UiIcon Name="location" /> @h.Address</p><p class="hostel-description">@(string.IsNullOrWhiteSpace(h.Description) ? "Comfortable campus accommodation with the essentials close at hand." : h.Description)</p></div>
+                <div class="occupancy-row"><span><strong>@h.TotalOccupancy</strong> occupied</span><span><strong>@h.TotalCapacity</strong> capacity</span></div>
+                <div class="occupancy-track" role="progressbar" aria-label="@h.Name occupancy" aria-valuemin="0" aria-valuemax="@h.TotalCapacity" aria-valuenow="@h.TotalOccupancy"><span style="width: @OccupancyPercent(h)%"></span></div>
+                <a class="hostel-action" href="/hostels/@h.Id">View rooms <span aria-hidden="true">→</span></a>
+            </article>
         }
     </div>
-    <div class="mt-3">
-        <small class="text-muted">Total: @totalCount • Page @currentPage / @totalPages</small>
-        <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="Prev" disabled="@(currentPage<=1)">Prev</button>
-        <button class="btn btn-sm btn-outline-secondary ms-1" @onclick="Next" disabled="@(currentPage>=totalPages)">Next</button>
-    </div>
+    <nav class="hostel-pagination" aria-label="Hostel pages"><span>Showing @hostels.Count of @totalCount hostels</span><div><button class="btn btn-sm btn-outline-secondary" @onclick="Prev" disabled="@(currentPage<=1)">← Previous</button><span>Page @currentPage of @Math.Max(totalPages, 1)</span><button class="btn btn-sm btn-outline-secondary" @onclick="Next" disabled="@(currentPage>=totalPages)">Next →</button></div></nav>
 }
 
 @code {
     [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
-    [Inject] public IConfiguration Config { get; set; } = default!;
-    private string apiBase => Config["ApiBaseUrl"] ?? "http://localhost:8080";
     private List<HostelDto> hostels = new();
     private string? error;
     private bool isLoading = true;
@@ -64,18 +63,25 @@ else
         try
         {
             var client = HttpFactory.CreateClient("Api");
-            var res = await client.GetAsync($"{apiBase}/api/v1.0/Hostels?onlyActive=false&page={currentPage}&pageSize={pageSize}");
+            var res = await client.GetAsync($"/api/v1.0/Hostels?onlyActive=true&page={currentPage}&pageSize={pageSize}");
             var body = await res.Content.ReadAsStringAsync();
-            if (!res.IsSuccessStatusCode) { error = body; return; }
+            if (!res.IsSuccessStatusCode) { error = FriendlyError(body); return; }
             var opts = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var paged = System.Text.Json.JsonSerializer.Deserialize<Paged<HostelDto>>(body, opts);
             if (paged is not null) { hostels = paged.Items.ToList(); totalCount = paged.TotalCount; totalPages = paged.TotalPages; }
         }
-        catch (Exception ex) { error = ex.Message; }
+        catch (Exception) { error = "The accommodation service is temporarily unavailable. Please try again in a moment."; }
         finally { isLoading = false; }
     }
     private async Task Prev() { if (currentPage>1) { currentPage--; await Load(); } }
     private async Task Next() { if (currentPage<totalPages) { currentPage++; await Load(); } }
+    private static int OccupancyPercent(HostelDto hostel) => hostel.TotalCapacity <= 0 ? 0 : (int)Math.Clamp(Math.Round((double)hostel.TotalOccupancy / hostel.TotalCapacity * 100), 0, 100);
+    private static string FriendlyError(string body)
+    {
+        try { using var doc = System.Text.Json.JsonDocument.Parse(body); if (doc.RootElement.TryGetProperty("error", out var e)) return e.GetString() ?? "Please try again."; }
+        catch { }
+        return "The accommodation service is temporarily unavailable. Please try again in a moment.";
+    }
 
     private record HostelDto(int Id, string Name, string? Description, string Address, bool IsActive, int TotalCapacity, int TotalOccupancy, int AvailableSpots);
     private record Paged<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize, int TotalPages);

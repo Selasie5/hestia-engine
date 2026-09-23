@@ -33,8 +33,10 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
                 return Anonymous();
             }
 
-            var claims = ParseClaims(token);
-            var identity = new ClaimsIdentity(claims, "jwt");
+            var claims = ParseClaims(token).ToList();
+            var nameClaimType = claims.Any(c => c.Type == "name") ? "name" : ClaimTypes.Name;
+            var roleClaimType = claims.Any(c => c.Type == "role") ? "role" : ClaimTypes.Role;
+            var identity = new ClaimsIdentity(claims, "jwt", nameClaimType, roleClaimType);
             var user = new ClaimsPrincipal(identity);
             return new AuthenticationState(user);
         }
