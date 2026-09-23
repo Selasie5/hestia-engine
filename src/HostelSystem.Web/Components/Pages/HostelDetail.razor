@@ -5,9 +5,10 @@
 
 <PageTitle>Hostel Detail — HostelSystem</PageTitle>
 
+<div class="hostel-detail-page">
 @if (isLoading)
 {
-    <p>Loading hostel...</p>
+    <div class="detail-loading" aria-busy="true"><span class="spinner-border text-primary" aria-hidden="true"></span><span>Loading hostel…</span></div>
 }
 else if (!string.IsNullOrWhiteSpace(error))
 {
@@ -19,12 +20,16 @@ else if (hostel is null)
 }
 else
 {
-    <h3>@hostel.Name <small class="text-muted">#@hostel.Id</small></h3>
-    <p>@hostel.Address</p>
-    <p class="text-muted">@hostel.Description</p>
-    <p><span class="badge bg-primary">@hostel.TotalCapacity capacity</span> <span class="badge bg-success">@hostel.AvailableSpots available</span></p>
+    <header class="detail-heading">
+        <a class="detail-back" href="/hostels">← All hostels</a>
+        <div class="detail-title-row">
+            <div><span class="eyebrow">Hostel details</span><h1>@hostel.Name</h1><p>@hostel.Address</p></div>
+            <span class="detail-availability">@hostel.AvailableSpots spaces available</span>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(hostel.Description)) { <p class="detail-description">@hostel.Description</p> }
+    </header>
 
-    <h5 class="mt-4">Available Rooms</h5>
+    <div class="rooms-heading"><div><h2>Available rooms</h2><p>Choose the room that works best for you.</p></div><span>@rooms.Count @(rooms.Count == 1 ? "room" : "rooms")</span></div>
     @if (roomsLoading)
     {
         <p>Loading rooms...</p>
@@ -35,21 +40,19 @@ else
     }
     else
     {
-        <div class="row g-3">
+        <div class="room-grid">
             @foreach (var r in rooms)
             {
-                <div class="col-md-6 col-lg-4">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <h6 class="card-title">@r.RoomNumber <small class="text-muted">(@r.CurrentOccupancy/@r.Capacity)</small></h6>
-                            <p class="card-text">GHS @r.PricePerSemester / semester</p>
-                            <p><span class="badge @(r.IsAvailable ? "bg-success" : "bg-secondary")">@(r.IsAvailable ? "Available" : "Full")</span></p>
-                            <button class="btn btn-sm btn-primary" @onclick="() => Apply(r.Id)" disabled="@(applyBusy == r.Id)">
-                                @(applyBusy == r.Id ? "Applying..." : "Apply for this room")
-                            </button>
-                        </div>
+                <article class="room-card">
+                    <div class="room-image-wrap"><img src="/room-placeholder.jpg" alt="A furnished student room representative of room @r.RoomNumber" loading="lazy" /><span class="room-status @(r.IsAvailable ? null : "full")">@(r.IsAvailable ? "Available" : "Full")</span></div>
+                    <div class="room-card-body">
+                        <div class="room-title"><div><span>Room</span><h3>@r.RoomNumber</h3></div><span class="room-capacity">@r.CurrentOccupancy of @r.Capacity occupied</span></div>
+                        <div class="room-price"><strong>GHS @r.PricePerSemester.ToString("N2")</strong><span>per semester</span></div>
+                        <button class="btn btn-primary room-apply" @onclick="() => Apply(r.Id)" disabled="@(!r.IsAvailable || applyBusy == r.Id)">
+                            @(applyBusy == r.Id ? "Submitting application…" : r.IsAvailable ? "Apply for this room" : "Room currently full")
+                        </button>
                     </div>
-                </div>
+                </article>
             }
         </div>
     }
@@ -57,8 +60,9 @@ else
     {
         <div class="alert @(applyError ? "alert-danger" : "alert-success") mt-3">@applyMsg</div>
     }
-    <p class="mt-3"><a href="/hostels">&larr; Back to hostels</a> • <a href="/applications">My Applications</a></p>
+    <p class="detail-footer"><a href="/hostels">&larr; Back to hostels</a><a href="/applications">My applications →</a></p>
 }
+</div>
 
 @code {
     [Parameter] public int Id { get; set; }

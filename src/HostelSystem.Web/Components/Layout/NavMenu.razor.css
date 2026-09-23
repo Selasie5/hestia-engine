@@ -47,7 +47,7 @@
 }
 
 .nav-scrollable {
-    height: calc(100vh - 96px);
+    height: calc(100% - 96px);
     display: flex;
     flex-direction: column;
     overflow-y: auto;

@@ -5,6 +5,7 @@
 
 <PageTitle>Hostels — HostelSystem</PageTitle>
 
+<div class="hostels-page">
 <header class="hostel-heading">
     <div>
         <span class="eyebrow">Accommodation directory</span>
@@ -47,6 +48,7 @@ else
     </div>
     <nav class="hostel-pagination" aria-label="Hostel pages"><span>Showing @hostels.Count of @totalCount hostels</span><div><button class="btn btn-sm btn-outline-secondary" @onclick="Prev" disabled="@(currentPage<=1)">← Previous</button><span>Page @currentPage of @Math.Max(totalPages, 1)</span><button class="btn btn-sm btn-outline-secondary" @onclick="Next" disabled="@(currentPage>=totalPages)">Next →</button></div></nav>
 }
+</div>
 
 @code {
     [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
