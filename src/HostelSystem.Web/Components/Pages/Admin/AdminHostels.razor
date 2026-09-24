@@ -112,7 +112,7 @@ else
     private List<RoomDraft> roomDrafts = new();
     private int RoomStep => creatingHostel ? 2 : 1;
     private int ReviewStep => creatingHostel ? 3 : 2;
-    private bool CanAddRoom => !string.IsNullOrWhiteSpace(roomNumber) && roomCapacity > 0 && roomPrice >= 0;
+    private bool CanAddRoom => !string.IsNullOrWhiteSpace(roomNumber) && roomCapacity > 0 && roomPrice > 0;
     private bool CanContinue => wizardStep == 1 && creatingHostel ? !string.IsNullOrWhiteSpace(newName) && !string.IsNullOrWhiteSpace(newAddress) : wizardStep == RoomStep && roomDrafts.Count > 0;
 
     protected override async Task OnInitializedAsync() => await Load();
