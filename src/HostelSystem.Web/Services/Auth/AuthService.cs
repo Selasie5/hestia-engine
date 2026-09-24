@@ -42,6 +42,20 @@ public class AuthService
         return _httpFactory.CreateClient("AuthBypass");
     }
 
+    public async Task<HttpClient> CreateAuthenticatedApiClientAsync()
+    {
+        var client = CreateApiClient();
+        var accessToken = await GetAccessTokenAsync();
+
+        if (!string.IsNullOrWhiteSpace(accessToken))
+        {
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        }
+
+        return client;
+    }
+
     public async Task<(bool Ok, string? Error)> LoginAsync(string email, string password)
     {
         try
