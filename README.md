@@ -10,14 +10,14 @@ Clean Architecture + CQRS/MediatR + Blazor Server — hostel browsing, applicati
 git clone https://github.com/Selasie5/hestia-engine.git
 cd hestia-engine
 
-# API — SQLite auto-migrates + seeds on first run (port 8080, Swagger /swagger)
-dotnet run --project src/HostelSystem.Api/HostelSystem.Api.csproj
+# API — SQLite auto-migrates + seeds on first run
+dotnet run --project src/HostelSystem.Api/HostelSystem.Api.csproj --urls http://localhost:8080
 # → http://localhost:8080/health
 # → http://localhost:8080/swagger
 
-# Web — Blazor Server (port 5000, proxies to ApiBaseUrl)
-dotnet run --project src/HostelSystem.Web/HostelSystem.Web.csproj
-# → http://localhost:5000  (login /register → hostels → apply → pay)
+# Web — Blazor Server
+dotnet run --project src/HostelSystem.Web/HostelSystem.Web.csproj --urls http://localhost:5000
+# → http://localhost:5000  (login → hostels → apply → allocation → Paystack)
 
 # Tests
 dotnet test
@@ -37,7 +37,7 @@ src/HostelSystem.Application  — CQRS Commands/Queries (MediatR), DTOs, Interfa
 src/HostelSystem.Infrastructure — EF Core (AppDbContext, AppIdentityDbContext, Migrations, EntityConfigurations), Repositories, Services (PaystackGateway+QrCodeService, EmailService console/SMTP, MemoryCache), DataSeeder, DependencyInjection (DatabaseProvider switch)
 src/HostelSystem.Identity     — ASP.NET Identity (ApplicationUser, AppIdentityDbContext, TokenService, IdentitySeeder)
 src/HostelSystem.Api          — Controllers (Auth, Hostels, Rooms, Applications, Allocations, Students, Payments), Program.cs (JWT, RateLimiting auth, Health, Swagger), Middlewares
-src/HostelSystem.Web          — Blazor Server (AuthService+JwtAuthenticationStateProvider+AuthHeaderHandler 401→refresh, Login/Register/Logout, NavMenu role-based, Hostels/HostelDetail, Applications, Allocations, Payments list + QR, Admin Dashboard/Pending/Allocations/Payments/Hostels)
+src/HostelSystem.Web          — Interactive Blazor Server portal with protected-browser-storage JWT auth, role-aware navigation, hostel/room discovery, application tracking, allocation-led Paystack checkout, payment history/QR, and Admin Dashboard/Applications/Allocations/Payments/Hostels
 
 docs/ — database-provider, backup-restore, retention-policy, schema (Mermaid ERD), query-review, email-setup
 postman/ — Hestia_Postman.json
@@ -56,6 +56,37 @@ dotnet user-secrets set "Smtp:Host" "smtp.mailtrap.io" --project src/HostelSyste
 ```
 
 Env / Docker: `Jwt__Secret`, `Paystack__SecretKey`, `Smtp__Host`, `ConnectionStrings__DefaultConnection`, `DatabaseProvider` (Sqlite|SqlServer). See `.env.example`.
+
+The web project resolves its API base address in this order: `ApiHostPort`, `ApiBaseUrl`, then `http://localhost:8080`. The Quick Start commands match the checked-in `ApiBaseUrl`. If you use the API launch profile on port `5156`, override the web setting with `ApiBaseUrl=http://localhost:5156`.
+
+## Portal Workflows
+
+### Student
+
+1. Sign in and browse active hostels at `/hostels`.
+2. Open a hostel, choose an available room, and submit an application.
+3. Track or cancel the request at `/applications`.
+4. When an administrator approves the request, the backend atomically marks the application approved, updates room occupancy, creates an active allocation, and creates a pending payment due in 14 days.
+5. Open `/allocations` and select **Make payment**. Paystack checkout starts from the payment attached to that allocation.
+6. Paystack returns to `/payments?reference=...` (or `trxref=...`); the payment page verifies the reference and refreshes payment history. `/payments/{reference}` provides authenticated payment details and downloadable PNG/SVG QR codes.
+
+### Administrator
+
+- `/admin/applications` reviews pending requests. Approving a request creates the allocation and pending payment automatically; no separate allocation action is required.
+- `/admin/hostels` uses a guided modal to create a hostel and its initial rooms. Adding rooms to an existing hostel uses a separate room/review step flow.
+- `/admin/allocations` filters active and checked-out allocations and supports checkout.
+- `/admin/payments` filters, verifies, and refunds payments.
+
+Authenticated web requests read the JWT from the active Blazor circuit and attach it directly to protected API calls. Initial protected data loading is deferred until the interactive circuit is available, avoiding browser-storage JavaScript interop during static rendering.
+
+Meaningful list state is retained in URLs so refreshes and shared links preserve context:
+
+- `/hostels?page=2`
+- `/admin/applications?page=2`
+- `/admin/allocations?page=2&status=active`
+- `/admin/payments?page=2&status=Pending`
+
+Transient state such as loading indicators, confirmation messages, and unsaved modal fields remains local to the component.
 
 ## API Reference (v1.0)
 
@@ -84,7 +115,26 @@ CI: `.github/workflows/ci.yml` — restore → build Release → test (trx+cover
 
 ## Paystack + QR
 
-`Paystack:SecretKey` via user-secrets (never committed). `GET /Payments/{ref}/qr` encodes `{reference,amount,currency}` as JSON via QRCoder (ECC Q) — scannable. Web `Payments.razor` shows QR after initiate; `PaymentQr.razor` (`/payments/{ref}`) renders `<img src=/api/v1.0/Payments/{ref}/qr>`. Webhook verifies `x-paystack-signature` HMAC-SHA512. Verify endpoint is polling fallback.
+`Paystack:SecretKey` is supplied through user-secrets or environment variables and must never be committed. Payment initiation accepts an optional `callbackUrl`; the allocation page sends the web payment-history URL. Paystack may append either `reference` or `trxref`, both of which the web page accepts and verifies.
+
+Configure these Paystack URLs for the deployed services:
+
+```text
+Callback URL: https://hestia-web-kna0.onrender.com/payments
+Webhook URL:  https://hestia-api-tqud.onrender.com/api/v1.0/Payments/webhook
+```
+
+For the Quick Start configuration, the local browser callback is `http://localhost:5000/payments` (`http://localhost:5182/payments` when using the web HTTP launch profile). Paystack cannot deliver webhooks to localhost; use a public tunnel when testing webhook delivery locally.
+
+`GET /Payments/{reference}/qr?format=png|svg` is authenticated and encodes `{reference,amount,currency}` via QRCoder (ECC Q). The `/payments/{reference}` page retrieves the QR with the signed-in student's JWT. The webhook validates `x-paystack-signature` using HMAC-SHA512 and is the primary completion path; `GET /Payments/{reference}/verify` is the authenticated polling fallback.
+
+## Web UI Conventions
+
+- Authenticated navigation uses an inset sidebar and a user profile menu with sign-out.
+- Main content uses responsive page padding and horizontally scrollable data tables on narrow screens.
+- The interface uses a square-cornered component language (`border-radius: 0`) across buttons, cards, inputs, alerts, tables, and overlays. Loading spinners remain circular so their motion remains recognizable.
+- Hostel room cards use a representative room image, availability/occupancy information, and a full-width application action with progress and feedback states.
+- Pages provide distinct loading, empty, error, success, and disabled states rather than displaying raw API or HTML responses.
 
 ## Docs
 
@@ -96,14 +146,11 @@ CI: `.github/workflows/ci.yml` — restore → build Release → test (trx+cover
 - `docs/email-setup.md` — SMTP/Mailtrap + console fallback
 - `docs/render-deployment.md` — Render Blueprint deployment, persistence, Paystack, and verification
 
-Platform  Core URI
-  https://hestia-api-tqud.onrender.com
+## Deployed Services
 
-  Swagger Endpoint: 
-  https://hestia-api-tqud.onrender.com/swagger/index.html
-
-  Platform Web: 
-  https://hestia-web-kna0.onrender.com
+- API: https://hestia-api-tqud.onrender.com
+- Swagger: https://hestia-api-tqud.onrender.com/swagger/index.html
+- Web: https://hestia-web-kna0.onrender.com
 
 ## License
 
