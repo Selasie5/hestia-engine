@@ -1,4 +1,5 @@
 @page "/allocations"
+@using HostelSystem.Web.Services.Auth
 @attribute [Authorize]
 
 <PageTitle>My Allocation — HostelSystem</PageTitle>
@@ -11,11 +12,11 @@
 }
 else if (!string.IsNullOrWhiteSpace(error))
 {
-    <section class="allocation-empty"><h2>No active allocation yet</h2><p>@error</p><a class="btn btn-primary" href="/hostels">Browse available hostels</a></section>
+    <section class="allocation-empty"><h2>We couldn’t load your allocation</h2><p>@error</p><button class="btn btn-primary" @onclick="Load">Try again</button></section>
 }
 else if (alloc is null)
 {
-    <div class="alert alert-info">No active allocation.</div>
+    <section class="allocation-empty"><h2>No active allocation yet</h2><p>You don’t have an active room allocation.</p><a class="btn btn-primary" href="/hostels">Browse available hostels</a></section>
 }
 else
 {
@@ -45,23 +46,41 @@ else
 }
 
 @code {
-    [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
+    [Inject] public AuthService Auth { get; set; } = default!;
     [Inject] public AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
     [Inject] public NavigationManager Nav { get; set; } = default!;
     private AllocationDto? alloc; private bool isLoading = true; private string? error; private string? msg; private bool msgError; private bool busy;
     private PaymentRow? allocationPayment; private bool paymentBusy; private string email = "";
-    protected override async Task OnInitializedAsync() => await Load();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Load();
+        await InvokeAsync(StateHasChanged);
+    }
     private async Task Load()
     {
         isLoading = true; error = null;
         try
         {
-            var client = HttpFactory.CreateClient("Api");
+            var client = await Auth.CreateAuthenticatedApiClientAsync();
             var authState = await AuthStateProvider.GetAuthenticationStateAsync();
             email = authState.User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? authState.User.FindFirst("email")?.Value ?? "";
             var res = await client.GetAsync("/api/v1.0/Allocations/me");
             var body = await res.Content.ReadAsStringAsync();
-            if (!res.IsSuccessStatusCode) { error = ExtractError(body, "You don’t have an active room allocation yet."); alloc = null; return; }
+            if (res.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                alloc = null;
+                allocationPayment = null;
+                return;
+            }
+            if (!res.IsSuccessStatusCode)
+            {
+                error = res.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                    ? "Your sign-in could not be verified. Please sign out and sign in again."
+                    : ExtractError(body, "The allocation service could not complete the request.");
+                alloc = null;
+                return;
+            }
             alloc = System.Text.Json.JsonSerializer.Deserialize<AllocationDto>(body, new System.Text.Json.JsonSerializerOptions{ PropertyNameCaseInsensitive = true});
             var paymentResponse = await client.GetAsync("/api/v1.0/Payments/me");
             if (paymentResponse.IsSuccessStatusCode)
@@ -79,7 +98,7 @@ else
         busy = true; msg = null;
         try
         {
-            var client = HttpFactory.CreateClient("Api");
+            var client = await Auth.CreateAuthenticatedApiClientAsync();
             var res = await client.PostAsync($"/api/v1.0/Allocations/{alloc.Id}/checkout", null);
             var body = await res.Content.ReadAsStringAsync();
             if (!res.IsSuccessStatusCode) { msg = ExtractError(body, "We couldn’t check you out of this room."); msgError = true; }
@@ -95,7 +114,7 @@ else
         paymentBusy = true; msg = null;
         try
         {
-            var client = HttpFactory.CreateClient("Api");
+            var client = await Auth.CreateAuthenticatedApiClientAsync();
             var response = await client.PostAsJsonAsync("/api/v1.0/Payments/initiate", new { paymentId = allocationPayment.Id, email, callbackUrl = $"{Nav.BaseUri}payments" });
             var body = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode) { msg = ExtractError(body, "We couldn’t start your payment."); msgError = true; return; }
