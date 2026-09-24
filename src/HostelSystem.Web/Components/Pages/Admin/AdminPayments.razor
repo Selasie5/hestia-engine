@@ -1,12 +1,13 @@
 @page "/admin/payments"
 @using Microsoft.AspNetCore.Authorization
+@using HostelSystem.Web.Services.Auth
 @attribute [Authorize(Roles = "Admin")]
 
 <PageTitle>Payments — Admin</PageTitle>
 
 <h3>Payments</h3>
 <div class="d-flex gap-2 mb-3">
-    <select class="form-select form-select-sm" style="width:auto" @onchange="OnFilterChanged">
+    <select class="form-select form-select-sm" style="width:auto" value="@filterStatus" @onchange="OnFilterChanged">
         <option value="">All statuses</option>
         <option>Pending</option><option>Completed</option><option>Failed</option><option>Refunded</option>
     </select>
@@ -65,12 +66,17 @@ else
 }
 
 @code {
-    [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
+    [Inject] public AuthService Auth { get; set; } = default!;
+    [Inject] public NavigationManager Nav { get; set; } = default!;
+    [Parameter, SupplyParameterFromQuery(Name = "page")] public int Page { get; set; } = 1;
+    [Parameter, SupplyParameterFromQuery(Name = "status")] public string? Status { get; set; }
     private List<Row> items = new(); private bool isLoading = true; private string? error; private string? msg; private bool msgError;
     private int currentPage=1; private int pageSize=10; private int total; private int totalPages; private string? filterStatus;
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+        currentPage = Math.Max(1, Page);
+        filterStatus = string.IsNullOrWhiteSpace(Status) ? null : Status;
         await Load();
         await InvokeAsync(StateHasChanged);
     }
@@ -78,7 +84,7 @@ else
     {
         isLoading = true; error=null;
         try{
-            var client=HttpFactory.CreateClient("Api");
+            var client=await Auth.CreateAuthenticatedApiClientAsync();
             var url = $"/api/v1.0/Payments?page={currentPage}&pageSize={pageSize}";
             if(!string.IsNullOrWhiteSpace(filterStatus)) url += $"&status={filterStatus}";
             var res=await client.GetAsync(url);
@@ -95,18 +101,26 @@ else
     {
         filterStatus = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value?.ToString();
         currentPage = 1;
+        SyncUrl();
         await Load();
     }
     private async Task Verify(string reference)
     {
-        try{ var client=HttpFactory.CreateClient("Api"); var res=await client.GetAsync($"/api/v1.0/Payments/{reference}/verify"); var b=await res.Content.ReadAsStringAsync(); msg=b; msgError=!res.IsSuccessStatusCode; if(res.IsSuccessStatusCode) await Load(); } catch(Exception ex){ msg=ex.Message; msgError=true; }
+        try{ var client=await Auth.CreateAuthenticatedApiClientAsync(); var res=await client.GetAsync($"/api/v1.0/Payments/{reference}/verify"); var b=await res.Content.ReadAsStringAsync(); msg=b; msgError=!res.IsSuccessStatusCode; if(res.IsSuccessStatusCode) await Load(); } catch(Exception ex){ msg=ex.Message; msgError=true; }
     }
     private async Task Refund(int id)
     {
-        try{ var client=HttpFactory.CreateClient("Api"); var res=await client.PostAsJsonAsync("/api/v1.0/Payments/refund", new { paymentId = id }); var b=await res.Content.ReadAsStringAsync(); msg=b; msgError=!res.IsSuccessStatusCode; if(res.IsSuccessStatusCode) await Load(); } catch(Exception ex){ msg=ex.Message; msgError=true; }
+        try{ var client=await Auth.CreateAuthenticatedApiClientAsync(); var res=await client.PostAsJsonAsync("/api/v1.0/Payments/refund", new { paymentId = id }); var b=await res.Content.ReadAsStringAsync(); msg=b; msgError=!res.IsSuccessStatusCode; if(res.IsSuccessStatusCode) await Load(); } catch(Exception ex){ msg=ex.Message; msgError=true; }
     }
-    private async Task Prev(){ if(currentPage>1){currentPage--; await Load();} }
-    private async Task Next(){ if(currentPage<totalPages){currentPage++; await Load();} }
+    private async Task Prev(){ if(currentPage>1){currentPage--; SyncUrl(); await Load();} }
+    private async Task Next(){ if(currentPage<totalPages){currentPage++; SyncUrl(); await Load();} }
+    private void SyncUrl()
+    {
+        var query = new List<string>();
+        if (currentPage > 1) query.Add($"page={currentPage}");
+        if (!string.IsNullOrWhiteSpace(filterStatus)) query.Add($"status={Uri.EscapeDataString(filterStatus)}");
+        Nav.NavigateTo(query.Count == 0 ? "/admin/payments" : $"/admin/payments?{string.Join("&", query)}", replace: true);
+    }
     private record Row(int Id, int StudentId, decimal Amount, string Status, string? TransactionReference, DateTime DueDate, bool IsOverdue);
 }
 

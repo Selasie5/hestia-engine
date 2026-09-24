@@ -82,6 +82,8 @@ else
 
 @code {
     [Inject] public AuthService Auth { get; set; } = default!;
+    [Inject] public NavigationManager Nav { get; set; } = default!;
+    [Parameter, SupplyParameterFromQuery(Name = "page")] public int Page { get; set; } = 1;
     private List<Row> items = new(); private bool isLoading = true; private string? error; private string? msg; private bool msgError; private int? busy;
     private int currentPage = 1; private int pageSize = 10; private int total; private int totalPages;
     private bool showReject; private int rejectId; private string rejectReason = "";
@@ -89,6 +91,7 @@ else
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+        currentPage = Math.Max(1, Page);
         await Load();
         await InvokeAsync(StateHasChanged);
     }
@@ -141,8 +144,9 @@ else
         catch (Exception) { msg = "The applications service is temporarily unavailable."; msgError = true; }
         finally { busy = null; }
     }
-    private async Task Prev() { if (currentPage>1){ currentPage--; await Load(); } }
-    private async Task Next() { if (currentPage<totalPages){ currentPage++; await Load(); } }
+    private async Task Prev() { if (currentPage>1){ currentPage--; SyncUrl(); await Load(); } }
+    private async Task Next() { if (currentPage<totalPages){ currentPage++; SyncUrl(); await Load(); } }
+    private void SyncUrl() => Nav.NavigateTo(currentPage > 1 ? $"/admin/applications?page={currentPage}" : "/admin/applications", replace: true);
     private static string ExtractError(string body, string fallback)
     {
         try { using var doc = System.Text.Json.JsonDocument.Parse(body); if (doc.RootElement.TryGetProperty("error", out var value)) return value.GetString() ?? fallback; }

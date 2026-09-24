@@ -1,5 +1,6 @@
 @page "/payments"
 @using Microsoft.AspNetCore.Authorization
+@using HostelSystem.Web.Services.Auth
 @attribute [Authorize]
 
 <PageTitle>Payment History — Hestia</PageTitle>
@@ -62,7 +63,9 @@ else
 }
 
 @code {
-    [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
+    [Inject] public AuthService Auth { get; set; } = default!;
+    [Parameter, SupplyParameterFromQuery(Name = "reference")] public string? Reference { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "trxref")] public string? TransactionReference { get; set; }
     private List<PaymentRow> history = new();
     private bool historyLoading = true;
     private string? historyError;
@@ -70,14 +73,23 @@ else
     private bool verifyError;
     private string? verifyingReference;
 
-    protected override async Task OnInitializedAsync() => await LoadHistory();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await LoadHistory();
+        var returnedReference = Reference ?? TransactionReference;
+        if (!string.IsNullOrWhiteSpace(returnedReference))
+            await Verify(returnedReference);
+        await InvokeAsync(StateHasChanged);
+    }
 
     private async Task LoadHistory()
     {
         historyLoading = true; historyError = null;
         try
         {
-            var response = await HttpFactory.CreateClient("Api").GetAsync("/api/v1.0/Payments/me");
+            var client = await Auth.CreateAuthenticatedApiClientAsync();
+            var response = await client.GetAsync("/api/v1.0/Payments/me");
             var body = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode) { historyError = ExtractError(body, "We couldn’t load your payment history."); return; }
             history = System.Text.Json.JsonSerializer.Deserialize<List<PaymentRow>>(body, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
@@ -91,7 +103,8 @@ else
         verifyingReference = reference; verifyMessage = null; verifyError = false;
         try
         {
-            var response = await HttpFactory.CreateClient("Api").GetAsync($"/api/v1.0/Payments/{Uri.EscapeDataString(reference)}/verify");
+            var client = await Auth.CreateAuthenticatedApiClientAsync();
+            var response = await client.GetAsync($"/api/v1.0/Payments/{Uri.EscapeDataString(reference)}/verify");
             var body = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode) { verifyMessage = ExtractError(body, "We couldn’t verify this payment."); verifyError = true; return; }
             verifyMessage = "Payment status updated.";
