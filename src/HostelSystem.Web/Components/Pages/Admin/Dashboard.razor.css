@@ -1,7 +1,7 @@
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.6rem; }
 .page-heading h1 { margin: 0 0 .35rem; font-size: 1.8rem; font-weight: 800; }
 .page-heading p { margin: 0; color: #7c8799; font-size: .85rem; }
-.metric-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; }
+.metric-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; }
 .metric-card { display: flex; align-items: flex-start; gap: 1rem; padding: 1.25rem; border: 1px solid #e4e8f0; border-radius: .85rem; background: #fff; box-shadow: 0 3px 14px rgba(23,35,60,.03); }
 .metric-card > div { display: flex; min-width: 0; flex-direction: column; }
 .metric-card small { color: #7f8a9d; font-size: .7rem; font-weight: 700; }
@@ -17,5 +17,5 @@
 .quick-actions-panel > a { display: flex; align-items: center; gap: .75rem; padding: .9rem 1.15rem; border-bottom: 1px solid #eff1f5; color: #17233c; text-decoration: none; }.quick-actions-panel > a:hover { background: #fafbfe; }.quick-actions-panel > a div { display: flex; flex: 1; flex-direction: column; }.quick-actions-panel > a strong { font-size: .76rem; }.quick-actions-panel > a small { margin-top: .15rem; color: #8a94a5; font-size: .61rem; }.quick-actions-panel > a b { color: #a4acba; }
 .mini-summary { display: grid; grid-template-columns: 1fr 1fr; margin: 1rem; padding: .9rem; border-radius: .7rem; background: #f7f8fb; }.mini-summary span { display: flex; flex-direction: column; padding: 0 .5rem; }.mini-summary span + span { border-left: 1px solid #e2e6ee; }.mini-summary small { color: #8993a5; font-size: .6rem; }.mini-summary strong { margin-top: .2rem; font-size: 1rem; }
 .loading-panel,.empty-state { display: flex; min-height: 260px; flex-direction: column; align-items: center; justify-content: center; color: #7f8a9d; }.loading-panel p,.empty-state p { margin: .7rem 0 0; font-size: .8rem; }.empty-state span { display: grid; width: 42px; height: 42px; margin-bottom: .7rem; place-items: center; border-radius: 50%; color: #16886d; background: #e7f8f2; }.empty-state strong { color: #344159; font-size: .85rem; }
-@media (max-width: 1150px) { .metric-grid { grid-template-columns: repeat(2,1fr); }.dashboard-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1150px) { .dashboard-grid { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .page-heading { align-items: flex-start; flex-direction: column; }.metric-grid { grid-template-columns: 1fr; }.page-heading .btn { width: 100%; } }
