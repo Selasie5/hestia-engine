@@ -1,5 +1,6 @@
 @page "/payments/{Reference}"
 @using Microsoft.AspNetCore.Authorization
+@using HostelSystem.Web.Services.Auth
 @attribute [Authorize]
 
 <PageTitle>Payment QR — Hestia</PageTitle>
@@ -46,7 +47,7 @@
 
 @code {
     [Parameter] public string Reference { get; set; } = string.Empty;
-    [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
+    [Inject] public AuthService Auth { get; set; } = default!;
 
     private string? qrPngData;
     private string? qrSvgData;
@@ -55,14 +56,19 @@
     private bool verifying;
     private string? verifyMessage;
 
-    protected override async Task OnParametersSetAsync() => await LoadQr();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await LoadQr();
+        await InvokeAsync(StateHasChanged);
+    }
 
     private async Task LoadQr()
     {
         qrLoading = true; qrError = null; qrPngData = null; qrSvgData = null;
         try
         {
-            var client = HttpFactory.CreateClient("Api");
+            var client = await Auth.CreateAuthenticatedApiClientAsync();
             var safeReference = Uri.EscapeDataString(Reference);
             var pngTask = client.GetAsync($"/api/v1.0/Payments/{safeReference}/qr?format=png");
             var svgTask = client.GetAsync($"/api/v1.0/Payments/{safeReference}/qr?format=svg");
@@ -87,7 +93,7 @@
         verifying = true; verifyMessage = null;
         try
         {
-            var client = HttpFactory.CreateClient("Api");
+            var client = await Auth.CreateAuthenticatedApiClientAsync();
             var res = await client.GetAsync($"/api/v1.0/Payments/{Uri.EscapeDataString(Reference)}/verify");
             var body = await res.Content.ReadAsStringAsync();
             verifyMessage = res.IsSuccessStatusCode ? "Payment status refreshed." : $"Verification failed: {body}";
