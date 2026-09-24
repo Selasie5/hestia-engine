@@ -6,10 +6,18 @@
 
 <PageTitle>Pending Applications — Admin</PageTitle>
 
-<h3>Pending Applications</h3>
-<div class="d-flex gap-2 mb-3">
-    <button class="btn btn-sm btn-outline-secondary" @onclick="Load">Refresh</button>
-    <span class="align-self-center text-muted">Page @currentPage / @totalPages (total @total)</span>
+<header class="applications-header">
+    <div>
+        <span class="eyebrow">Application review</span>
+        <h1>Pending applications</h1>
+        <p>Review student requests and assign available rooms.</p>
+    </div>
+    <button class="btn btn-outline-secondary" @onclick="Load" disabled="@isLoading">Refresh queue</button>
+</header>
+
+<div class="queue-summary" aria-live="polite">
+    <span><strong>@total</strong> pending @(total == 1 ? "request" : "requests")</span>
+    <span>Page @currentPage of @Math.Max(totalPages, 1)</span>
 </div>
 
 @if (isLoading)
@@ -26,29 +34,33 @@ else if (items.Count == 0)
 }
 else
 {
-    <table class="table table-sm">
-        <thead><tr><th>#</th><th>Student</th><th>Room</th><th>Date</th><th>Notes</th><th>Action</th></tr></thead>
-        <tbody>
-            @foreach (var a in items)
-            {
-                <tr>
-                    <td>@a.Id</td>
-                    <td>@a.StudentName <small class="text-muted">(@a.StudentNumber)</small></td>
-                    <td>@a.RoomNumber <small class="text-muted">(@a.HostelName)</small></td>
-                    <td>@a.ApplicationDate.ToLocalTime().ToString("yyyy-MM-dd")</td>
-                    <td><small>@(a.AdditionalNotes ?? "-")</small></td>
-                    <td>
-                        <button class="btn btn-sm btn-success" @onclick="() => Approve(a.Id)" disabled="@(busy==a.Id)">Approve</button>
-                        <button class="btn btn-sm btn-danger ms-1" @onclick="() => PromptReject(a.Id)">Reject</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-    <div class="d-flex gap-2">
+    <div class="applications-table-wrap">
+        <table class="table applications-table">
+            <thead><tr><th scope="col">Ref</th><th scope="col">Student</th><th scope="col">Requested room</th><th scope="col">Submitted</th><th scope="col">Notes</th><th scope="col" class="action-heading">Decision</th></tr></thead>
+            <tbody>
+                @foreach (var a in items)
+                {
+                    <tr>
+                        <td><span class="application-ref">#@a.Id</span></td>
+                        <td><span class="cell-primary">@a.StudentName</span><span class="cell-secondary">@a.StudentNumber</span></td>
+                        <td><span class="cell-primary">@a.RoomNumber</span><span class="cell-secondary">@a.HostelName</span></td>
+                        <td><time datetime="@a.ApplicationDate.ToString("O")">@a.ApplicationDate.ToLocalTime().ToString("dd MMM yyyy")</time></td>
+                        <td><span class="application-notes">@(string.IsNullOrWhiteSpace(a.AdditionalNotes) ? "No notes" : a.AdditionalNotes)</span></td>
+                        <td>
+                            <div class="application-actions">
+                                <button class="btn btn-sm btn-success" @onclick="() => Approve(a.Id)" disabled="@(busy==a.Id)">@(busy == a.Id ? "Working…" : "Approve")</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => PromptReject(a.Id)" disabled="@(busy == a.Id)">Reject</button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <nav class="queue-pagination" aria-label="Applications pagination">
         <button class="btn btn-sm btn-outline-secondary" @onclick="Prev" disabled="@(currentPage<=1)">Prev</button>
         <button class="btn btn-sm btn-outline-secondary" @onclick="Next" disabled="@(currentPage>=totalPages)">Next</button>
-    </div>
+    </nav>
 }
 
 @if (showReject)

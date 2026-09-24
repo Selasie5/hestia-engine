@@ -1,0 +1,49 @@
+.applications-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.applications-header h1 { margin: 0; font-size: clamp(1.65rem, 3vw, 2rem); font-weight: 800; }
+.applications-header p { margin: .45rem 0 0; color: var(--hestia-muted); }
+
+.queue-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .8rem 1rem;
+    border: 1px solid var(--hestia-border);
+    border-bottom: 0;
+    color: var(--hestia-muted);
+    background: #fff;
+    font-size: .8rem;
+}
+
+.queue-summary strong { color: var(--hestia-navy); }
+.applications-table-wrap { overflow-x: auto; border: 1px solid var(--hestia-border); background: #fff; }
+.applications-table { min-width: 860px; margin: 0; table-layout: fixed; }
+.applications-table th:nth-child(1) { width: 8%; }
+.applications-table th:nth-child(2) { width: 24%; }
+.applications-table th:nth-child(3) { width: 22%; }
+.applications-table th:nth-child(4) { width: 14%; }
+.applications-table th:nth-child(5) { width: 16%; }
+.applications-table th:nth-child(6) { width: 16%; }
+.applications-table tbody tr:last-child > * { border-bottom: 0; }
+.applications-table td { height: 88px; }
+.application-ref { color: var(--hestia-muted); font-size: .8rem; font-weight: 700; }
+.cell-primary, .cell-secondary { display: block; }
+.cell-primary { color: var(--hestia-navy); font-weight: 700; }
+.cell-secondary { margin-top: .18rem; color: var(--hestia-muted); font-size: .78rem; }
+.applications-table time { white-space: nowrap; color: #4f5b70; font-size: .84rem; }
+.application-notes { display: -webkit-box; overflow: hidden; color: var(--hestia-muted); font-size: .8rem; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.action-heading { text-align: right; }
+.application-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+.application-actions .btn { min-width: 76px; }
+.queue-pagination { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
+
+@media (max-width: 700px) {
+    .applications-header { align-items: stretch; flex-direction: column; }
+    .applications-header .btn { width: 100%; }
+}

@@ -14,7 +14,16 @@
     --hestia-ring: rgba(52, 87, 213, .34);
     --motion-fast: 150ms;
     --motion-ease: cubic-bezier(.2, 0, 0, 1);
+    --bs-border-radius: 0;
+    --bs-border-radius-sm: 0;
+    --bs-border-radius-lg: 0;
+    --bs-border-radius-xl: 0;
+    --bs-border-radius-xxl: 0;
+    --bs-border-radius-pill: 0;
 }
+
+/* Hestia uses a crisp, square-cornered component language. */
+*:not(.spinner-border):not(.spinner-grow), *::before, *::after { border-radius: 0 !important; }
 
 html { scroll-behavior: smooth; }
 html, body { min-height: 100%; }
