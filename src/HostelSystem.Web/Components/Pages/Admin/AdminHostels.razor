@@ -115,7 +115,12 @@ else
     private bool CanAddRoom => !string.IsNullOrWhiteSpace(roomNumber) && roomCapacity > 0 && roomPrice > 0;
     private bool CanContinue => wizardStep == 1 && creatingHostel ? !string.IsNullOrWhiteSpace(newName) && !string.IsNullOrWhiteSpace(newAddress) : wizardStep == RoomStep && roomDrafts.Count > 0;
 
-    protected override async Task OnInitializedAsync() => await Load();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Load();
+        await InvokeAsync(StateHasChanged);
+    }
     private async Task Load()
     {
         isLoading = true; error = null;

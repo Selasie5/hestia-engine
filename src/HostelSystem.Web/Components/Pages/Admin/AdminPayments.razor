@@ -68,7 +68,12 @@ else
     [Inject] public IHttpClientFactory HttpFactory { get; set; } = default!;
     private List<Row> items = new(); private bool isLoading = true; private string? error; private string? msg; private bool msgError;
     private int currentPage=1; private int pageSize=10; private int total; private int totalPages; private string? filterStatus;
-    protected override async Task OnInitializedAsync() => await Load();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Load();
+        await InvokeAsync(StateHasChanged);
+    }
     private async Task Load()
     {
         isLoading = true; error=null;

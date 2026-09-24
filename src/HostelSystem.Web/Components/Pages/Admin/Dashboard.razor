@@ -69,7 +69,12 @@ else
     private bool isLoading = true; private string? error;
     private Kpi kpi = new(0,0,0,0,0,0);
     private List<RecentApp> recent = new();
-    protected override async Task OnInitializedAsync() => await Load();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Load();
+        await InvokeAsync(StateHasChanged);
+    }
     private async Task Load()
     {
         isLoading = true; error = null; recent = new();

@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
+using Microsoft.JSInterop;
 
 namespace HostelSystem.Web.Services.Auth;
 
@@ -114,10 +115,24 @@ public class AuthService
 
     public async Task ClearLocalSessionAsync()
     {
-        await _storage.DeleteAsync(AccessTokenKey);
-        await _storage.DeleteAsync(RefreshTokenKey);
-        await _storage.DeleteAsync(ExpiresAtKey);
-        await NotifyAuthStateChangedAsync();
+        try
+        {
+            await _storage.DeleteAsync(AccessTokenKey);
+            await _storage.DeleteAsync(RefreshTokenKey);
+            await _storage.DeleteAsync(ExpiresAtKey);
+            await NotifyAuthStateChangedAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Protected browser storage uses JS interop and is unavailable while a
+            // component is being statically rendered. The interactive circuit can
+            // safely retry session cleanup later.
+            _logger.LogDebug(ex, "Browser storage is unavailable during static rendering");
+        }
+        catch (JSDisconnectedException ex)
+        {
+            _logger.LogDebug(ex, "Browser disconnected before session cleanup completed");
+        }
     }
 
     public async Task<string?> GetAccessTokenAsync()
