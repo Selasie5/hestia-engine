@@ -152,6 +152,10 @@ For the Quick Start configuration, the local browser callback is `http://localho
 - Swagger: https://hestia-api-tqud.onrender.com/swagger/index.html
 - Web: https://hestia-web-kna0.onrender.com
 
+- Admin Credentials :
+  email: admin@hostelsystem.local
+  password: Pineapple1!
+
 ## License
 
 MIT — team project.
